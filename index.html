@@ -1,0 +1,1152 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>THS功率分流混动架构模拟器</title>
+    <link rel="icon" href="./icon.png" />
+    <link href="./style.css" rel="stylesheet">
+    <style>
+        body {
+            font-family: sans-serif;
+            background-color: #f7f7f7;
+            min-height: 100vh;
+        }
+
+        .slider-thumb::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: currentColor;
+            cursor: grab;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
+            margin-top: -6px;
+        }
+
+        .slider-thumb::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: currentColor;
+            cursor: grab;
+            box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
+        }
+
+        .gauge-bar {
+            transition: width 0.1s linear;
+        }
+
+        /* Layout for Canvas overlay */
+        .canvas-container {
+            position: relative;
+            width: 100%;
+            height: 260px;
+        }
+
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Ensures the Y-axis label on the map is readable */
+        .vertical-text {
+            transform: rotate(-90deg);
+        }
+
+        /* Gear visualization style */
+        .gear-tooth {
+            stroke-linecap: round;
+        }
+    </style>
+</head>
+
+<body class="p-4 md:p-8 text-gray-800">
+
+    <div class="max-w-7xl mx-auto bg-white shadow-xl rounded-xl p-6 md:p-4">
+        <header class="mb-3 border-b pb-2">
+            <h1 class="font-bold text-gray-900 whitespace-nowrap" style="font-size: clamp(1.2rem, 5.8vw, 1.875rem);">THS功率分流混动架构模拟器</h1>
+        </header>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
+
+            <!-- LEFT: Controls (4 cols) -->
+            <div class="lg:col-span-4 space-y-2 bg-gray-50 p-6 rounded-lg border border-gray-100">
+                <h2 class="text-lg font-bold text-gray-700 flex items-center mb-4">
+                    <span class="w-2 h-5 bg-gray-800 mr-2 rounded"></span> 驾驶员输入
+                </h2>
+
+                <!-- Speed Input -->
+                <div class="space-y-2">
+                    <div class="flex justify-between">
+                        <label class="text-sm font-semibold text-gray-600">车速 (Vehicle Speed)</label>
+                        <span class="text-sm font-bold text-mg2-color"><span id="v_val">0</span> km/h</span>
+                    </div>
+                    <input type="range" id="v_input" min="-20" max="180" step="1" value="0"
+                        class="w-full h-2 bg-mg2-color/20 rounded-lg slider-thumb text-mg2-color">
+                </div>
+
+                <!-- ICE RPM Input -->
+                <div class="space-y-2">
+                    <div class="flex justify-between">
+                        <label class="text-sm font-semibold text-gray-600">发动机转速 (ICE RPM)</label>
+                        <span class="text-sm font-bold text-ice-color"><span id="nice_val">0</span> RPM</span>
+                    </div>
+                    <input type="range" id="nice_input" min="0" max="6000" step="10" value="0"
+                        class="w-full h-2 bg-ice-color/20 rounded-lg slider-thumb text-ice-color">
+                </div>
+
+                <!-- ICE Torque Input -->
+                <div class="space-y-2">
+                    <div class="flex justify-between">
+                        <label class="text-sm font-semibold text-gray-600">发动机扭矩 (ICE Torque)</label>
+                        <span class="text-sm font-bold text-ice-color"><span id="tice_val">0</span> Nm</span>
+                    </div>
+                    <input type="range" id="tice_input" min="0" max="188" step="1" value="0"
+                        class="w-full h-2 bg-ice-color/20 rounded-lg slider-thumb text-ice-color">
+                </div>
+
+                <!-- Load Torque Input -->
+                <div class="space-y-2">
+                    <div class="flex justify-between">
+                        <label class="text-sm font-semibold text-gray-600">负载扭矩 (Load Torque)</label>
+                        <span class="text-sm font-bold text-gray-700"><span id="tload_val">0</span> Nm</span>
+                    </div>
+                    <input type="range" id="tload_input" min="-700" max="700" step="1" value="0"
+                        class="w-full h-2 bg-gray-300 rounded-lg slider-thumb text-gray-600">
+                    <p class="text-xs text-gray-400">正值=爬坡/加速阻力，负值=下坡/制动回收</p>
+                </div>
+
+                <!-- ICE Map -->
+                <div class="pt-6 border-t border-gray-200">
+                    <h2 class="text-lg font-bold text-gray-700 flex items-center mb-3">
+                        <span class="w-2 h-5 bg-gray-800 mr-2 rounded"></span> ICE 热效率 MAP (M20A-FXS)
+                    </h2>
+                    <div class="bg-white p-2 rounded border border-gray-200 shadow-sm relative">
+                        <canvas id="ice_map_canvas" width="280" height="200" class="w-full"></canvas>
+                        <div class="absolute left-1 top-0 h-full w-16 -ml-6 flex items-center justify-center pointer-events-none"
+                            style="transform: translateY(-20px);">
+                            <span class="vertical-text text-xs text-gray-400">扭矩 (Nm)</span>
+                        </div>
+                        <div class="flex justify-between text-xs text-gray-400 mt-1 px-1" style="margin-left: 25px;">
+                            <span>0</span>
+                            <span>转速 (RPM)</span>
+                            <span>6000</span>
+                        </div>
+                        <div class="flex items-center justify-center space-x-2 text-xs mt-2 flex-wrap">
+                            <span class="font-bold mr-1">热效率:</span>
+                            <div class="flex items-center mr-2"><span
+                                    class="w-3 h-3 rounded-full bg-[#EF4444] mr-1"></span>&lt;35%</div>
+                            <div class="flex items-center mr-2"><span
+                                    class="w-3 h-3 rounded-full bg-[#F59E0B] mr-1"></span>35-38%</div>
+                            <div class="flex items-center mr-2"><span
+                                    class="w-3 h-3 rounded-full bg-[#10B981] mr-1"></span>38-40%</div>
+                            <div class="flex items-center"><span
+                                    class="w-3 h-3 rounded-full bg-[#059669] mr-1"></span>40%+</div>
+                        </div>
+                    </div>
+                    <p id="current_efficiency" class="text-center font-bold text-sm mt-2 text-gray-700">当前热效率: N/A</p>
+                </div>
+            </div>
+
+            <!-- MIDDLE/RIGHT: Visuals & Stats (8 cols) -->
+            <div class="lg:col-span-8 flex flex-col gap-6">
+
+                <!-- 1. Nomograph (Lever Diagram) -->
+                <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+                    <h3 class="text-sm font-bold text-gray-500 uppercase mb-2">THS 杠杆图 (Nomograph)</h3>
+                    <div class="canvas-container bg-gray-50 rounded border border-gray-100">
+                        <canvas id="nomograph_canvas"></canvas>
+                    </div>
+                    <div class="flex justify-between text-xs text-gray-400 mt-1 px-4">
+                        <span class="text-mg1-color font-bold">Sun (MG1)</span>
+                        <span class="text-ice-color font-bold">Carrier (ICE)</span>
+                        <span class="text-mg2-color font-bold">Ring (MG2)</span>
+                    </div>
+                </div>
+
+                <!-- 2. PSD Gear Animation -->
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 flex flex-col items-center">
+                        <h3 class="text-sm font-bold text-gray-500 mb-4 w-full text-left">PSD行星齿轮动画（RPM × 1/100）</h3>
+                        <canvas id="psd_canvas" width="240" height="240"
+                            style="width: 240px; height: 240px; will-change: transform;"></canvas>
+                        <div class="flex justify-around w-full mt-4 text-xs font-bold">
+                            <span class="text-mg1-color">Sun: <span id="rpm_sun">0</span></span>
+                            <span class="text-ice-color">Carrier: <span id="rpm_carrier">0</span></span>
+                            <span class="text-mg2-color">Ring: <span id="rpm_ring">0</span></span>
+                        </div>
+                    </div>
+
+                    <!-- Power Gauges -->
+                    <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 space-y-5">
+                        <h3 class="text-sm font-bold text-gray-500 uppercase mb-2">功率流状态 (Power Status)</h3>
+
+                        <!-- ICE Power -->
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="font-bold text-ice-color">发动机 (ICE)</span>
+                                <span id="p_ice_disp" class="font-mono">0.0 kW</span>
+                            </div>
+                            <div class="h-3 bg-gray-200 rounded-full overflow-hidden">
+                                <div id="bar_ice" class="h-full bg-ice-color w-0"></div>
+                            </div>
+                        </div>
+
+                        <!-- Wheel Power -->
+                        <div>
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="font-bold text-ring-color">车轮 (Wheel)</span>
+                                <span id="p_wheel_disp" class="font-mono">0.0 kW</span>
+                            </div>
+                            <!-- Wheel Power Gauge: Left=Recovery (Gray, Negative Power), Right=Drive (Yellow, Positive Power) -->
+                            <div class="h-3 bg-gray-200 rounded-full overflow-hidden relative">
+                                <div id="bar_wheel_pos" class="h-full bg-ring-color absolute left-1/2 w-0"></div>
+                                <div id="bar_wheel_neg" class="h-full bg-gray-500 absolute right-1/2 w-0"></div>
+                            </div>
+                            <div class="flex justify-between text-[10px] text-gray-400 mt-1">
+                                <span>← 回收 (Recovery)</span>
+                                <span>驱动 (Drive)→</span>
+                            </div>
+                        </div>
+
+                        <!-- Battery Power (P_Batt = P_MG1 + P_MG2) -->
+                        <div class="pt-2 border-t border-dashed">
+                            <div class="flex justify-between text-xs mb-1">
+                                <span class="font-bold text-batt-color">电池 (Battery)</span>
+                                <span id="p_batt_disp" class="font-mono">0.0 kW</span>
+                            </div>
+                            <!-- Battery Gauge: Left=Charge (Green, Negative Power), Right=Discharge (Purple, Positive Power) -->
+                            <div class="h-3 bg-gray-200 rounded-full overflow-hidden relative">
+                                <div id="bar_batt_dis" class="h-full bg-batt-color absolute left-1/2 w-0"></div>
+                                <!-- P_Batt > 0 (Discharge) -->
+                                <div id="bar_batt_chg" class="h-full bg-green-500 absolute right-1/2 w-0"></div>
+                                <!-- P_Batt < 0 (Charge) -->
+                            </div>
+                            <div class="flex justify-between text-[10px] text-gray-400 mt-1">
+                                <span>← 充电 (Charge)</span>
+                                <span>放电 (Discharge)→</span>
+                            </div>
+                        </div>
+
+                        <!-- Motor States Text -->
+                        <div class="grid grid-cols-2 gap-2 text-xs mt-2">
+                            <div class="p-2 bg-blue-50 rounded border border-blue-100">
+                                <span class="block font-bold text-mg1-color">MG1</span>
+                                <span id="mg1_state_text" class="block text-gray-600">Idle</span>
+                                <span id="p_mg1_disp" class="block font-mono text-gray-800">0.0 kW</span>
+                            </div>
+                            <div class="p-2 bg-green-50 rounded border border-green-100">
+                                <span class="block font-bold text-mg2-color">MG2</span>
+                                <span id="mg2_state_text" class="block text-gray-600">Idle</span>
+                                <span id="p_mg2_disp" class="block font-mono text-gray-800">0.0 kW</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <footer class="mt-8 pt-2 text-center text-sm text-gray-500">
+            <p>作者: Fox-Hulio</p>
+            <p class="mt-1">
+                个人主页: <a href="https://space.bilibili.com/396029763" target="_blank" rel="noopener noreferrer"
+                    class="text-blue-600 hover:underline">https://space.bilibili.com/396029763</a>
+            </p>
+        </footer>
+    </div>
+
+    <script>
+        (function () {
+            // --- Performance Optimized THS Simulator ---
+            // Constants & Config
+            const K = 2.6;
+            const RATIO_SUN_PLANET = 2 / (K - 1); // r_sun / r_planet
+            const TO_RAD = Math.PI / 180; // Pre-calculate radian conversion
+
+            // Animation State
+            let state = {
+                v: 0, n_ice: 0, t_ice: 0, t_load: 0,
+                n_mg2: 0, n_mg1: 0,
+                ang_sun: 0, ang_carrier: 0, ang_ring: 0, ang_planet: 0
+            };
+
+            // Performance Optimization: Cached DOM elements
+            const elements = {};
+            let psdCtx = null;
+            const paths = {}; // Store vector gear paths
+            let iceMapBackgroundCanvas = null;
+            let animationFrameId = null;
+            let resizeObserver = null;
+            let isInitialized = false;
+
+            // Optimized DOM helpers
+            const safeSetText = (el, text) => { if (el && el.textContent !== text) el.textContent = text; };
+            const safeSetWidth = (el, widthStr) => { if (el?.style && el.style.width !== widthStr) el.style.width = widthStr; };
+            const $ = id => document.getElementById(id);
+
+            // Cache all DOM elements at initialization
+            function cacheElements() {
+                const elementIds = [
+                    'v_input', 'v_val', 'nice_input', 'nice_val', 'tice_input', 'tice_val',
+                    'tload_input', 'tload_val', 'rpm_sun', 'rpm_carrier', 'rpm_ring',
+                    'p_ice_disp', 'bar_ice', 'p_wheel_disp', 'bar_wheel_pos', 'bar_wheel_neg',
+                    'p_batt_disp', 'bar_batt_dis', 'bar_batt_chg', 'p_mg1_disp', 'mg1_state_text',
+                    'p_mg2_disp', 'mg2_state_text', 'current_efficiency', 'ice_map_canvas',
+                    'nomograph_canvas', 'psd_canvas'
+                ];
+
+                elementIds.forEach(id => {
+                    elements[id] = $(id);
+                });
+            }
+
+            // --- Efficiency Map Logic (Refined) ---
+            /**
+             * M20A-FXS (Dynamic Force 2.0L) 热效率 Map 拟合
+             * 参数: 最大功率 112kW@6000rpm, 最大扭矩 188Nm(4400-5200rpm)
+             * 峰值热效率: 2600rpm/125Nm @41%
+             */
+            function getEfficiency(rpm, torque) {
+                if (rpm <= 0 || torque <= 0) return 0;
+
+                // 1. Max Torque Curve (Physical Limit)
+                const maxTorque = getMaxTorque(rpm);
+                const isOverload = torque > maxTorque;
+
+                // 2. Efficiency Calculation (Gaussian-like "Kidney" shape)
+                // Peak center: 2600 RPM, 125 Nm
+                const PEAK_RPM = 2600;
+                const PEAK_TORQUE = 125;
+                const PEAK_EFF = 0.41; // 41% max
+
+                // Normalized distances
+                const rpmDist = (rpm - PEAK_RPM) / 6000;
+                const torqueDist = (torque - PEAK_TORQUE) / 188;
+
+                // Base efficiency calculation:
+                // Using distance-based linear decay (exponent 1.0) instead of quadratic (2.0)
+                // This creates a sharper drop near the peak but maintains a "fatter tail" (higher efficiency) at high loads/RPMs.
+                const dist = Math.sqrt(rpmDist * rpmDist + torqueDist * torqueDist);
+                let eff = PEAK_EFF - 0.2 * dist;
+
+                // 3. Shape Corrections
+                // Penalty for very low load (pumping losses dominate, minimally reduced penalty)
+                if (torque < 40) {
+                    eff -= 0.01 * Math.pow((40 - torque) / 40, 2);
+                }
+                // Penalty for high RPM friction (adjusted penalty)
+                if (rpm > 3000) {
+                    eff -= 0.01 * Math.pow((rpm - 3000) / 3000, 2);
+                }
+
+                // Cap min/max
+                eff = Math.max(0.2, Math.min(eff, PEAK_EFF));
+
+                return eff;
+            }
+
+            function getMaxTorque(rpm) {
+                // M20A-FXS Torque Curve
+                // 最大功率: 112kW@6000rpm, 最大扭矩: 188Nm(4400-5200rpm)
+                // 原有低转速特性保持不变
+
+                if (rpm < 100) return rpm * (30 / 100); // Linear rise to 30Nm at 100rpm
+                if (rpm < 1000) return 30 + (rpm - 100) * (100 / 900); // Stronger idle torque
+                if (rpm < 2400) {
+                    // 1200->140, 2400->170
+                    return 130 + (rpm - 1000) * (40 / 1400);
+                }
+                if (rpm < 4400) {
+                    // 2400->170, 4400->188 (逐步上升到峰值平台)
+                    return 170 + (rpm - 2400) * (18 / 2000);
+                }
+                if (rpm <= 5200) {
+                    // 4400-5200: 峰值扭矩平台 188Nm
+                    return 188;
+                }
+                // 5200->6000: 功率限制下的下降
+                // P = n*T/9550, 107kW@6000rpm => T = 112*9550/6000 = 178.3Nm
+                // 线性插值 5200@188Nm -> 6000@170Nm
+                return 188 - (rpm - 5200) * (10 / 800);
+            }
+
+            /**
+             * 绘制静态的发动机 Map 背景图到离屏 Canvas
+             */
+            function preRenderIceMapBackground() {
+                if (!elements.ice_map_canvas) return;
+                iceMapBackgroundCanvas = document.createElement('canvas');
+                iceMapBackgroundCanvas.width = elements.ice_map_canvas.width;
+                iceMapBackgroundCanvas.height = elements.ice_map_canvas.height;
+                const ctx = iceMapBackgroundCanvas.getContext('2d');
+
+                const PADDING_LEFT = 22;
+                const PADDING_TOP = 5;
+                const PADDING_BOTTOM = 5;
+                const rpmMax = 6000;
+                const torqueMax = 200;
+                const ORIGIN_X = PADDING_LEFT;
+                const ORIGIN_Y = elements.ice_map_canvas.height - PADDING_BOTTOM;
+
+                // Draw Heatmap
+                const R_STEPS = 200;
+                const T_STEPS = 200;
+                const stepR = rpmMax / R_STEPS;
+                const W = iceMapBackgroundCanvas.width - PADDING_LEFT;
+                const H = iceMapBackgroundCanvas.height - PADDING_BOTTOM - PADDING_TOP;
+
+                const stepT = torqueMax / T_STEPS;
+                const wR = W / R_STEPS + 1; // +1 to avoid gaps
+                const hT = H / T_STEPS + 1;
+
+                for (let i = 0; i < R_STEPS; i++) {
+                    const r = i * stepR;
+                    const maxT = getMaxTorque(r);
+
+                    for (let j = 0; j < T_STEPS; j++) {
+                        const t = j * stepT;
+
+                        const x = ORIGIN_X + i * (W / R_STEPS);
+                        const y = ORIGIN_Y - ((j + 1) * (H / T_STEPS));
+
+                        if (t > maxT) {
+                            // Invalid area
+                            ctx.fillStyle = '#F3F4F6'; // Light gray
+                        } else {
+                            const eff = getEfficiency(r, t);
+                            // Color Mapping (M20A-FXS style)
+                            if (eff >= 0.40) ctx.fillStyle = '#059669';      // >40% (Peak)
+                            else if (eff >= 0.38) ctx.fillStyle = '#10B981'; // 38-40%
+                            else if (eff >= 0.35) ctx.fillStyle = '#F59E0B'; // 35-38%
+                            else ctx.fillStyle = '#EF4444';                  // <35%
+                        }
+                        ctx.fillRect(x, y, wR, hT);
+                    }
+                }
+
+                // Draw Max Torque Line
+                ctx.beginPath();
+                ctx.strokeStyle = '#374151';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([4, 2]);
+                for (let r = 0; r <= rpmMax; r += 50) {
+                    const t = getMaxTorque(r);
+                    const x = ORIGIN_X + (r / rpmMax) * W;
+                    const y = ORIGIN_Y - (t / torqueMax) * H;
+                    if (r === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // Draw Axes Lines
+                ctx.strokeStyle = '#9CA3AF';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(ORIGIN_X, 0); ctx.lineTo(ORIGIN_X, ORIGIN_Y); // Y-Axis
+                ctx.moveTo(ORIGIN_X, ORIGIN_Y); ctx.lineTo(elements.ice_map_canvas.width, ORIGIN_Y); // X-Axis
+                ctx.stroke();
+
+                // Y-axis Ticks
+                ctx.fillStyle = '#6B7280';
+                ctx.font = '10px Inter';
+                ctx.textAlign = 'right';
+                ctx.fillText('200', ORIGIN_X - 5, ORIGIN_Y - H + 5);
+                ctx.fillText('0', ORIGIN_X - 5, ORIGIN_Y - 5);
+            }
+
+            /**
+             * 绘制发动机 Map 图和当前工作点
+             */
+            function drawIceMap(rpm, torque) {
+                const canvas = elements.ice_map_canvas;
+                if (!canvas || !iceMapBackgroundCanvas) return;
+                const ctx = canvas.getContext('2d');
+
+                // Optimization: Skip redraw if parameters haven't changed
+                const currentParams = `${rpm.toFixed(1)}_${torque.toFixed(1)}`;
+                if (lastIceParams === currentParams) return;
+                lastIceParams = currentParams;
+
+                const PADDING_LEFT = 22;
+                const PADDING_TOP = 5;
+                const PADDING_BOTTOM = 5;
+                const W = canvas.width - PADDING_LEFT;
+                const H = canvas.height - PADDING_BOTTOM - PADDING_TOP;
+                const rpmMax = 6000;
+                const torqueMax = 200;
+                const ORIGIN_X = PADDING_LEFT;
+                const ORIGIN_Y = canvas.height - PADDING_BOTTOM;
+
+                // 1. Draw the pre-rendered background
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+                ctx.drawImage(iceMapBackgroundCanvas, 0, 0);
+
+                // Draw Current Operating Point
+                const currentX = ORIGIN_X + rpm / rpmMax * W;
+                const currentY = ORIGIN_Y - (torque / torqueMax * H);
+                const currentEff = getEfficiency(rpm, torque);
+                const maxT_current = getMaxTorque(rpm);
+
+                if (rpm > 0 && torque > 0) {
+                    // Check if out of bounds
+                    const isOutOfBounds = torque > maxT_current;
+
+                    ctx.beginPath();
+                    ctx.arc(currentX, currentY, 5, 0, Math.PI * 2);
+                    ctx.fillStyle = isOutOfBounds ? '#9CA3AF' : 'black';
+                    ctx.strokeStyle = 'white';
+                    ctx.lineWidth = 1.5;
+                    ctx.fill();
+                    ctx.stroke();
+
+                    // Update efficiency text
+                    const effPercent = (currentEff * 100).toFixed(1);
+                    const effText = isOutOfBounds ? `超出扭矩边界` : `当前热效率: ${effPercent}%`;
+                    safeSetText(elements.current_efficiency, effText);
+
+                    let newClass = '';
+                    if (isOutOfBounds) {
+                        newClass = 'text-center font-bold text-sm mt-2 text-gray-500';
+                    } else if (currentEff >= 0.40) {
+                        newClass = 'text-center font-bold text-sm mt-2 text-[#059669]';
+                    } else if (currentEff >= 0.38) {
+                        newClass = 'text-center font-bold text-sm mt-2 text-[#10B981]';
+                    } else if (currentEff >= 0.35) {
+                        newClass = 'text-center font-bold text-sm mt-2 text-[#F59E0B]';
+                    } else {
+                        newClass = 'text-center font-bold text-sm mt-2 text-[#EF4444]';
+                    }
+                    if (elements.current_efficiency.className !== newClass) elements.current_efficiency.className = newClass;
+                } else {
+                    safeSetText(elements.current_efficiency, `当前热效率: N/A`);
+                    const newClass = 'text-center font-bold text-sm mt-2 text-gray-700';
+                    if (elements.current_efficiency.className !== newClass) elements.current_efficiency.className = newClass;
+                }
+            }
+
+            // --- Core Physics Engine ---
+            const FACTOR_KMH_TO_RPM = 25.5;
+            const CONST_9550 = 9550;
+
+            function calculateSignedPower(n, t) {
+                // Simplified equivalent logic: (Math.abs(n) * t) / CONST_9550
+                // This maintains the original behavior: 
+                // positive power if rotating AND torquing in same direction OR if rotating backwards and torquing backwards
+                // Actually the original logic was: 
+                // n>=0: n*t/9550
+                // n<0: -n*t/9550 if t>0, n*t/9550 if t<0
+                // Simplified: Math.abs(n) * t / CONST_9550
+                return (Math.abs(n) * t) / CONST_9550;
+            }
+
+            function updatePhysics() {
+                if (!elements.v_input || !elements.nice_input || !elements.tice_input || !elements.tload_input) return;
+
+                state.v = parseFloat(elements.v_input.value);
+                state.n_ice = parseFloat(elements.nice_input.value);
+                state.t_ice = parseFloat(elements.tice_input.value);
+                state.t_load = parseFloat(elements.tload_input.value);
+
+                // 1. Kinematics
+                const n_mg2 = state.v * FACTOR_KMH_TO_RPM;
+                const n_mg1 = (1 + K) * state.n_ice - K * n_mg2;
+
+                // 2. Torque Balance
+                const t_ring_from_ice = state.t_ice * (K / (1 + K));
+                const t_sun_from_ice = state.t_ice * (1 / (1 + K));
+                const t_mg1 = -t_sun_from_ice;
+
+                const t_wheel = state.t_load;
+                let t_mg2;
+                if ((n_mg2 >= 0 && t_ring_from_ice >= 0) || (n_mg2 < 0 && t_ring_from_ice <= 0)) {
+                    t_mg2 = t_wheel - t_ring_from_ice;
+                } else {
+                    t_mg2 = t_wheel + Math.abs(t_ring_from_ice);
+                }
+
+                // 3. Power
+                const p_ice = (state.n_ice * state.t_ice) / CONST_9550;
+                const p_wheel = calculateSignedPower(n_mg2, state.t_load);
+                const p_mg1 = (n_mg1 * t_mg1) / CONST_9550;
+                const p_mg2 = calculateSignedPower(n_mg2, t_mg2);
+                const p_batt = p_mg1 + p_mg2;
+
+                // Update State
+                state.n_mg1 = n_mg1;
+                state.n_mg2 = n_mg2;
+
+                // --- Throttle DOM Updates to prevent Layout Thrashing ---
+                const now = performance.now();
+                if (!state.lastDomUpdate || now - state.lastDomUpdate > 16) { // ~60 DOM updates per second
+                    state.lastDomUpdate = now;
+
+                    // Update UI Text (RPMs)
+                    safeSetText(elements.rpm_sun, state.n_mg1.toFixed(0));
+                    safeSetText(elements.rpm_carrier, state.n_ice.toFixed(0));
+                    safeSetText(elements.rpm_ring, state.n_mg2.toFixed(0));
+
+                    // Power Gauges
+                    // ICE
+                    let iceText = p_ice.toFixed(1) + ' kW';
+                    if (Math.abs(p_ice) > 112.05) iceText += ' (Overload)';
+                    safeSetText(elements.p_ice_disp, iceText);
+                    if (elements.bar_ice) safeSetWidth(elements.bar_ice, Math.min(p_ice / 1.12, 100) + '%');
+
+                    // Wheel
+                    let wheelText = p_wheel.toFixed(1) + ' kW';
+                    if (Math.abs(p_wheel) > 145.05) wheelText += ' (Overload)';
+                    safeSetText(elements.p_wheel_disp, wheelText);
+                    const w_pct = Math.min((Math.abs(p_wheel) / 145) * 50, 50);
+                    if (p_wheel >= 0) {
+                        safeSetWidth(elements.bar_wheel_pos, w_pct + '%');
+                        safeSetWidth(elements.bar_wheel_neg, '0');
+                    } else {
+                        safeSetWidth(elements.bar_wheel_pos, '0');
+                        safeSetWidth(elements.bar_wheel_neg, w_pct + '%');
+                    }
+
+                    // Battery
+                    let battText = p_batt.toFixed(1) + ' kW';
+                    if (Math.abs(p_batt) > 33.05) battText += ' (Overload)';
+                    safeSetText(elements.p_batt_disp, battText);
+                    const b_pct = Math.min((Math.abs(p_batt) / 33) * 50, 50);
+                    if (p_batt > 0) {
+                        safeSetWidth(elements.bar_batt_dis, b_pct + '%');
+                        safeSetWidth(elements.bar_batt_chg, '0');
+                    } else {
+                        safeSetWidth(elements.bar_batt_dis, '0');
+                        safeSetWidth(elements.bar_batt_chg, b_pct + '%');
+                    }
+
+                    // MG1 & MG2 with Load Rate
+                    const mg1LoadRate = Math.abs(p_mg1) / 50.05 * 100;
+                    const mg1LoadText = mg1LoadRate > 100 ? '(Overload)' : `(${mg1LoadRate.toFixed(0)}%)`;
+                    const mg1Text = `${p_mg1.toFixed(1)} kW ${mg1LoadText}`;
+                    safeSetText(elements.p_mg1_disp, mg1Text);
+                    safeSetText(elements.mg1_state_text, Math.abs(p_mg1) < 0.1 ? 'Idle' : (p_mg1 > 0 ? 'Motoring (驱动)' : 'Generating (发电)'));
+
+                    const mg2LoadRate = Math.abs(p_mg2) / 83.05 * 100;
+                    const mg2LoadText = mg2LoadRate > 100 ? '(Overload)' : `(${mg2LoadRate.toFixed(0)}%)`;
+                    const mg2Text = `${p_mg2.toFixed(1)} kW ${mg2LoadText}`;
+                    safeSetText(elements.p_mg2_disp, mg2Text);
+                    safeSetText(elements.mg2_state_text, Math.abs(p_mg2) < 0.1 ? 'Idle' : (p_mg2 > 0 ? 'Motoring (驱动)' : 'Generating (发电)'));
+                }
+
+                // Draw Visuals (Canvas is faster, but still good to throttle if possible, done internally via cache)
+
+                // Draw Visuals
+                drawNomograph(state.n_mg1, state.n_ice, state.n_mg2, t_mg1, state.t_ice, t_mg2, state.t_load);
+                drawIceMap(state.n_ice, state.t_ice);
+            }
+
+            // --- PSD Gear Visualization (Path2D vectors, drawn each frame) ---
+            let gearPaths = null;
+
+            function initCanvasGears() {
+                if (!elements.psd_canvas) return;
+                const canvas = elements.psd_canvas;
+                const dpr = window.devicePixelRatio || 1;
+                const logicalSize = 240;
+                canvas.width = logicalSize * dpr;
+                canvas.height = logicalSize * dpr;
+                canvas.style.width = logicalSize + 'px';
+                canvas.style.height = logicalSize + 'px';
+                psdCtx = canvas.getContext('2d', { alpha: false });
+
+                const scale = 1.28;
+                const sunTeeth = 30;
+                const planetTeeth = (K - 1) * sunTeeth / 2;
+                const ringTeeth = K * sunTeeth;
+                const sunR = sunTeeth * scale;
+                const planetR = planetTeeth * scale;
+                const ringR = ringTeeth * scale;
+                const toothH = 6;
+                const ringExtR = ringR + toothH + 8;
+
+                function makePath(toothCount, pitchR, isInternal, holeR) {
+                    const path = new Path2D();
+                    const step = (2 * Math.PI) / toothCount;
+                    const bAngle = step * 0.6;
+                    const tAngle = bAngle * 0.4;
+                    const rTip = isInternal ? pitchR - toothH / 2 : pitchR + toothH / 2;
+                    const rBase = isInternal ? pitchR + toothH / 2 : pitchR - toothH / 2;
+                    for (let i = 0; i < toothCount; i++) {
+                        const a = i * step;
+                        const bs = a - bAngle / 2, ts = a - tAngle / 2, te = a + tAngle / 2;
+                        const be = a + bAngle / 2, nbs = a + step - bAngle / 2;
+                        i === 0
+                            ? path.moveTo(rBase * Math.cos(bs), rBase * Math.sin(bs))
+                            : path.lineTo(rBase * Math.cos(bs), rBase * Math.sin(bs));
+                        path.lineTo(rTip * Math.cos(ts), rTip * Math.sin(ts));
+                        path.arc(0, 0, rTip, ts, te);
+                        path.lineTo(rBase * Math.cos(be), rBase * Math.sin(be));
+                        path.arc(0, 0, rBase, be, nbs);
+                    }
+                    path.closePath();
+                    if (holeR) { path.moveTo(holeR, 0); path.arc(0, 0, holeR, 0, Math.PI * 2, true); }
+                    return path;
+                }
+
+                const carrierR = sunR + planetR;
+                const planetAngles = [-90, 30, 150].map(d => d * Math.PI / 180);
+
+                const ringExt = makePath(ringTeeth, ringExtR, false, 0);
+                const ringInt = makePath(ringTeeth, ringR, true, 0);
+                const ringCombined = new Path2D(ringExt); ringCombined.addPath(ringInt);
+
+                const carrierArms = new Path2D();
+                planetAngles.forEach(rad => {
+                    const ratio = (carrierR - 15) / carrierR;
+                    carrierArms.moveTo(0, 0);
+                    carrierArms.lineTo(carrierR * ratio * Math.cos(rad), carrierR * ratio * Math.sin(rad));
+                });
+                const carrierCenter = new Path2D();
+                carrierCenter.arc(0, 0, 12, 0, Math.PI * 2);
+
+                gearPaths = {
+                    sun: makePath(sunTeeth, sunR, false, 15),
+                    planet: makePath(planetTeeth, planetR, false, 12),
+                    ringExt, ringInt, ring: ringCombined,
+                    carrierArms, carrierCenter,
+                    planetOffsets: planetAngles.map(rad => ({
+                        x: carrierR * Math.cos(rad),
+                        y: carrierR * Math.sin(rad)
+                    })),
+                    ringMarkerR: Math.round((ringR + ringExtR) / 2),
+                    dpr
+                };
+            }
+
+            function drawPSD() {
+                if (!psdCtx || !gearPaths) return;
+                const ctx = psdCtx;
+                const dpr = gearPaths.dpr;
+                const logicalSize = 240;
+                const cx = logicalSize / 2, cy = logicalSize / 2;
+
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                ctx.fillStyle = '#ffffff';
+                ctx.fillRect(0, 0, logicalSize, logicalSize);
+                ctx.translate(cx, cy);
+
+                const angC = state.ang_carrier * TO_RAD;
+                const angR = state.ang_ring * TO_RAD;
+                const angS = state.ang_sun * TO_RAD;
+                const angP = state.ang_planet * TO_RAD;
+
+                // Ring gear
+                ctx.save();
+                ctx.rotate(angR);
+                ctx.fillStyle = '#10B981';
+                ctx.fill(gearPaths.ring, 'evenodd');
+                ctx.strokeStyle = '#059669'; ctx.lineWidth = 1;
+                ctx.stroke(gearPaths.ringExt);
+                ctx.stroke(gearPaths.ringInt);
+                // Ring markers
+                ctx.fillStyle = '#A7F3D0';
+                for (let i = 0; i < 8; i++) {
+                    const a = (i / 8) * Math.PI * 2;
+                    ctx.beginPath();
+                    ctx.arc(gearPaths.ringMarkerR * Math.cos(a), gearPaths.ringMarkerR * Math.sin(a), 4, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.restore();
+
+                // Carrier
+                ctx.save();
+                ctx.rotate(angC);
+                ctx.strokeStyle = '#EF4444'; ctx.lineWidth = 5; ctx.lineCap = 'round';
+                ctx.stroke(gearPaths.carrierArms);
+                ctx.fillStyle = '#EF4444';
+                ctx.fill(gearPaths.carrierCenter);
+                ctx.restore();
+
+                // Planets
+                gearPaths.planetOffsets.forEach(p => {
+                    ctx.save();
+                    ctx.rotate(angC);
+                    ctx.translate(p.x, p.y);
+                    ctx.rotate(angP);
+                    ctx.fillStyle = '#6B7280';
+                    ctx.fill(gearPaths.planet, 'evenodd');
+                    ctx.strokeStyle = '#6B7280'; ctx.lineWidth = 0.5;
+                    ctx.stroke(gearPaths.planet);
+                    // Planet markers
+                    ctx.fillStyle = '#D1D5DB';
+                    for (let i = 0; i < 4; i++) {
+                        const a = (i / 4) * Math.PI * 2;
+                        ctx.beginPath();
+                        ctx.arc(20 * Math.cos(a), 20 * Math.sin(a), 4, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                    ctx.restore();
+                });
+
+                // Sun gear
+                ctx.save();
+                ctx.rotate(angS);
+                ctx.fillStyle = '#3B82F6';
+                ctx.fill(gearPaths.sun, 'evenodd');
+                ctx.strokeStyle = '#3B82F6'; ctx.lineWidth = 0.5;
+                ctx.stroke(gearPaths.sun);
+                // Sun markers
+                ctx.fillStyle = '#DBEAFE';
+                for (let i = 0; i < 4; i++) {
+                    const a = (i / 4) * Math.PI * 2;
+                    ctx.beginPath();
+                    ctx.arc(25 * Math.cos(a), 25 * Math.sin(a), 3, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+                ctx.restore();
+            }
+
+            // --- Canvas Nomograph Drawing with Torque Distribution ---
+            let lastLeverState = { n_s: null, n_c: null, n_r: null, t_mg1: null, t_ice: null, t_mg2: null, t_load: null };
+            let lastIceParams = null;
+            let nomographBackgroundCanvas = null;
+
+            function drawNomograph(n_s, n_c, n_r, t_mg1, t_ice, t_mg2, t_load) {
+                const canvas = elements.nomograph_canvas;
+                if (!canvas) return;
+                const ctx = canvas.getContext('2d');
+                const w = canvas.width;
+                const h = canvas.height;
+                const dpr = window.devicePixelRatio || 1;
+                const logicalWidth = w / dpr;
+                const logicalHeight = h / dpr;
+
+                // Improved caching check without JSON.stringify
+                const hasStateChanged =
+                    lastLeverState.n_s !== n_s || lastLeverState.n_c !== n_c || lastLeverState.n_r !== n_r ||
+                    lastLeverState.t_mg1 !== t_mg1 || lastLeverState.t_ice !== t_ice ||
+                    lastLeverState.t_mg2 !== t_mg2 || lastLeverState.t_load !== t_load;
+
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+                if (!hasStateChanged && nomographBackgroundCanvas && nomographBackgroundCanvas.width === w && nomographBackgroundCanvas.height === h) {
+                    ctx.clearRect(0, 0, w, h);
+                    ctx.drawImage(nomographBackgroundCanvas, 0, 0);
+                } else {
+                    ctx.clearRect(0, 0, w, h);
+                    if (!nomographBackgroundCanvas || nomographBackgroundCanvas.width !== w || nomographBackgroundCanvas.height !== h) {
+                        nomographBackgroundCanvas = document.createElement('canvas');
+                        nomographBackgroundCanvas.width = w;
+                        nomographBackgroundCanvas.height = h;
+                        const bgCtx = nomographBackgroundCanvas.getContext('2d');
+                        bgCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+                        drawStaticNomograph(bgCtx, logicalWidth, logicalHeight);
+                    }
+                    ctx.drawImage(nomographBackgroundCanvas, 0, 0);
+                    // Update state cache
+                    lastLeverState = { n_s, n_c, n_r, t_mg1, t_ice, t_mg2, t_load };
+                }
+
+                ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+                const axisY = logicalHeight / 2;
+
+                // Adjusted Scale to fit high RPM MG1 (up to +/- 16000 RPM)
+                const scaleY = 0.01; // 1 RPM = 0.01 pixels
+
+                const x_mg1 = logicalWidth * 0.2;
+                const x_mg2 = logicalWidth * 0.8;
+                const dist_total = x_mg2 - x_mg1;
+                const x_ice = x_mg1 + dist_total * (K / (1 + K));
+
+                const y_mg1 = axisY - (n_s * scaleY);
+                const y_ice = axisY - (n_c * scaleY);
+                const y_mg2 = axisY - (n_r * scaleY);
+
+                // Draw Lever Line
+                ctx.beginPath();
+                ctx.strokeStyle = '#374151';
+                ctx.lineWidth = 4;
+                ctx.moveTo(x_mg1, y_mg1);
+                ctx.lineTo(x_mg2, y_mg2);
+                ctx.stroke();
+
+                // Draw Points
+                drawPoint(ctx, x_mg1, y_mg1, '#3B82F6', n_s.toFixed(0));
+                drawPoint(ctx, x_ice, y_ice, '#EF4444', n_c.toFixed(0));
+                drawPoint(ctx, x_mg2, y_mg2, '#10B981', n_r.toFixed(0));
+
+                // Draw Torque Distribution Arrows
+                const arrowScale = 0.03; // Scale factor for torque visualization (3 pixels per 1 Nm)
+                const arrowSpacing = 30; // Vertical spacing from the points
+                const arrowSpacingLoad = 75; // Extra spacing for load torque
+
+                // 当倒车时，为了符合视觉直觉，反转MG2和Load的扭矩箭头方向
+                // 倒车时，驱动扭矩(mg2)应为负（向下），负载扭矩应为正（向上）
+                const isReverse = n_r < 0;
+                const display_t_mg2 = isReverse ? -t_mg2 : t_mg2;
+                const display_t_load = isReverse ? t_load : -t_load;
+
+                drawTorqueArrow(ctx, x_mg1, y_mg1, t_mg1, '#3B82F6', 'MG1', arrowScale, arrowSpacing);
+                drawTorqueArrow(ctx, x_ice, y_ice, t_ice, '#EF4444', 'ICE', arrowScale, arrowSpacing);
+                drawTorqueArrow(ctx, x_mg2, y_mg2, display_t_mg2, '#10B981', 'MG2', arrowScale, arrowSpacing);
+                drawTorqueArrow(ctx, x_mg2, y_mg2, display_t_load, '#6B7280', 'Load', arrowScale, arrowSpacingLoad);
+            }
+
+            // New function to draw static parts of the nomograph
+            function drawStaticNomograph(ctx, w, h) {
+                const axisY = h / 2;
+                const x_mg1 = w * 0.2;
+                const x_mg2 = w * 0.8;
+                const dist_total = x_mg2 - x_mg1;
+                const x_ice = x_mg1 + dist_total * (K / (1 + K));
+
+                // Draw Axis Line
+                ctx.beginPath();
+                ctx.strokeStyle = '#e5e7eb';
+                ctx.lineWidth = 1;
+                ctx.moveTo(0, axisY);
+                ctx.lineTo(w, axisY);
+                ctx.stroke();
+
+                // Draw Vertical Axes
+                drawAxis(ctx, x_mg1, 'Sun (MG1)', '#3B82F6', h);
+                drawAxis(ctx, x_ice, 'Carrier (ICE)', '#EF4444', h);
+                drawAxis(ctx, x_mg2, 'Ring (MG2)', '#10B981', h);
+            }
+
+            /**
+             * 绘制扭矩箭头
+             * @param {CanvasRenderingContext2D} ctx - Canvas context
+             * @param {number} x - X position
+             * @param {number} y - Y position
+             * @param {number} torque - 扭矩值 (Nm)
+             * @param {string} color - 箭头颜色
+             * @param {string} label - 标签
+             * @param {number} scale - 缩放因子
+             * @param {number} spacing - 距离点的垂直间距
+             */
+            function drawTorqueArrow(ctx, x, y, torque, color, label, scale, spacing) {
+                if (Math.abs(torque) < 0.1) return; // 不绘制过小的扭矩
+
+                const arrowLength = Math.abs(torque) * scale;
+                const maxArrowLength = 80; // 限制最大箭头长度
+                const limitedLength = Math.min(arrowLength, maxArrowLength);
+
+                // 决定箭头方向: 正值向上，负值向下
+                const direction = torque > 0 ? -1 : 1;
+                const startY = y + spacing * direction;
+                const endY = startY + limitedLength * direction;
+
+                // 箭头尺寸
+                const arrowHeadSize = 12;
+
+                // 绘制箭头线
+                ctx.beginPath();
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 3;
+                ctx.lineCap = 'round';
+                ctx.moveTo(x, startY);
+                ctx.lineTo(x, endY);
+                ctx.stroke();
+
+                // 绘制箭头头部
+                ctx.beginPath();
+                ctx.fillStyle = color;
+                ctx.moveTo(x, endY);
+                ctx.lineTo(x - arrowHeadSize / 2, endY - arrowHeadSize * direction);
+                ctx.lineTo(x + arrowHeadSize / 2, endY - arrowHeadSize * direction);
+                ctx.closePath();
+                ctx.fill();
+
+                // 绘制扭矩值文字
+                ctx.fillStyle = color;
+                ctx.font = 'bold 12px Inter';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = direction > 0 ? 'top' : 'bottom';
+                const textY = endY + 15 * direction;
+                ctx.fillText(torque.toFixed(0) + ' Nm', x, textY);
+            }
+
+            function drawAxis(ctx, x, label, color, h) {
+                ctx.beginPath();
+                ctx.strokeStyle = color;
+                ctx.lineWidth = 1;
+                ctx.setLineDash([5, 5]);
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, h);
+                ctx.stroke();
+                ctx.setLineDash([]);
+            }
+
+            function drawPoint(ctx, x, y, color, text) {
+                ctx.beginPath();
+                ctx.fillStyle = color;
+                ctx.arc(x, y, 6, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Limit Y for text to stay on screen
+                let textY = y - 10;
+                if (textY < 20) textY = y + 20;
+
+                ctx.fillStyle = 'white';
+                ctx.font = 'bold 12px Inter';
+                const textMetrics = ctx.measureText(text);
+                const textWidth = textMetrics.width;
+
+                const padding = 4;
+                const rectX = x + 12;
+                const rectY = textY - 12;
+                const rectWidth = textWidth + padding * 2;
+                const rectHeight = 16;
+
+                ctx.fillStyle = '#f7f7f7'; // Match background
+                ctx.fillRect(rectX, rectY, rectWidth, rectHeight);
+
+                ctx.fillStyle = color;
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(text, rectX + padding, rectY + rectHeight / 2);
+            }
+
+            // Optimized event handling with minimal latency
+            function setupEventListeners() {
+                const inputIds = ['v_input', 'nice_input', 'tice_input', 'tload_input'];
+                inputIds.forEach(id => {
+                    const el = elements[id];
+                    if (el) {
+                        el.addEventListener('input', (e) => {
+                            updateInputDisplay(e.target);
+                            // Call updatePhysics synchronously during the input event.
+                            // This runs BEFORE the next animate() frame fires, not inside it.
+                            // Avoids competing with drawPSD for the same frame budget.
+                            updatePhysics();
+                        }, { passive: true });
+                    }
+                });
+            }
+
+            // Update input display values immediately
+            function updateInputDisplay(input) {
+                const value = parseFloat(input.value);
+                const displayId = input.id.replace('_input', '_val');
+                const displayElement = elements[displayId];
+                if (displayElement) {
+                    displayElement.textContent = value.toFixed(0);
+                }
+            }
+
+            // Optimized animation loop variables (Singleton)
+            const scale = 0.01;
+            const fixedDt = 1 / 60;
+
+            function animate() {
+                // Advance by EXACTLY one fixed step per drawn frame.
+                // dt is NOT based on real elapsed time. This means:
+                // - Every rendered frame moves the gear by the same amount → constant visual velocity
+                // - If a frame is dropped by GC/OS, that frame simply isn't drawn → no forward jump
+                // - If we used real dt here, a dropped frame would cause dt=2/60 catch-up → visible jump
+                state.ang_sun += (state.n_mg1 / 60 * 360 * fixedDt) * scale;
+                state.ang_carrier += (state.n_ice / 60 * 360 * fixedDt) * scale;
+                state.ang_ring += (state.n_mg2 / 60 * 360 * fixedDt) * scale;
+
+                const rpm_planet_rel = (state.n_mg1 - state.n_ice) * (-RATIO_SUN_PLANET);
+                state.ang_planet += (rpm_planet_rel / 60 * 360 * fixedDt) * scale;
+
+                drawPSD();
+
+                animationFrameId = requestAnimationFrame(animate);
+            }
+
+            function startAnimation() {
+                if (!animationFrameId) {
+                    animationFrameId = requestAnimationFrame(animate);
+                }
+            }
+
+            function stopAnimation() {
+                if (animationFrameId) {
+                    cancelAnimationFrame(animationFrameId);
+                    animationFrameId = null;
+                }
+            }
+
+            // Setup responsive canvas with performance optimization
+            function setupResponsiveCanvas() {
+                const nomographCanvas = elements.nomograph_canvas;
+                if (!nomographCanvas) return;
+
+                resizeObserver = new ResizeObserver(entries => {
+                    window.requestAnimationFrame(() => {
+                        if (!entries || !entries.length) return;
+                        const entry = entries[0];
+                        const rect = entry.contentRect;
+                        const dpr = window.devicePixelRatio || 1;
+                        const physicalWidth = Math.round(rect.width * dpr);
+                        const physicalHeight = Math.round(rect.height * dpr);
+
+                        if (nomographCanvas.width !== physicalWidth || nomographCanvas.height !== physicalHeight) {
+                            nomographCanvas.width = physicalWidth;
+                            nomographCanvas.height = physicalHeight;
+                            updatePhysics();
+                        }
+                    });
+                });
+                resizeObserver.observe(nomographCanvas);
+            }
+
+            // Memory management and cleanup
+            function cleanup() {
+                if (animationFrameId) {
+                    cancelAnimationFrame(animationFrameId);
+                    animationFrameId = null;
+                }
+                if (resizeObserver) {
+                    resizeObserver.disconnect();
+                    resizeObserver = null;
+                }
+
+            }
+
+            // Page visibility API for performance
+            function setupPageVisibilityHandling() {
+                document.addEventListener('visibilitychange', () => {
+                    if (document.hidden) {
+                        stopAnimation();
+                    } else {
+                        startAnimation();
+                    }
+                });
+            }
+
+            // Initialize application
+            function init() {
+                if (isInitialized) return;
+                isInitialized = true;
+
+                cacheElements();
+                preRenderIceMapBackground();
+                initCanvasGears();
+                setupEventListeners();
+                setupResponsiveCanvas();
+                setupPageVisibilityHandling();
+
+                updatePhysics();
+                startAnimation();
+            }
+
+            // Start initialization
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', init);
+            } else {
+                init();
+            }
+
+            // Cleanup on page unload
+            window.addEventListener('beforeunload', cleanup);
+
+        })();
+    </script>
+</body>
+
+
+</html>
