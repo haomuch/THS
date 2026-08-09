@@ -8,6 +8,18 @@
     <link rel="icon" href="./icon.png" />
     <link rel="apple-touch-icon" href="./icon.png">
     <link href="./style.css" rel="stylesheet">
+
+    <!--
+      Preload the whole ES module graph.
+      Without this the browser can only discover physics/ice-map/nomograph/psd
+      *after* app.js has been downloaded and parsed, which costs an extra
+      serial round trip before a single pixel of any canvas can be drawn.
+    -->
+    <link rel="modulepreload" href="./js/app.js">
+    <link rel="modulepreload" href="./js/physics.js">
+    <link rel="modulepreload" href="./js/ice-map.js">
+    <link rel="modulepreload" href="./js/nomograph.js">
+    <link rel="modulepreload" href="./js/psd.js">
 </head>
 
 <body class="p-4 md:p-8 text-gray-800">
@@ -119,7 +131,7 @@
                     <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4 flex flex-col items-center">
                         <h3 class="text-sm font-bold text-gray-500 mb-4 w-full text-left">PSD行星齿轮动画（RPM × 1/100）</h3>
                         <canvas id="psd_canvas" width="240" height="240"
-                            style="width: 240px; height: 240px; will-change: transform;"></canvas>
+                            style="width: 240px; height: 240px;"></canvas>
                         <div class="flex justify-around w-full mt-4 text-xs font-bold">
                             <span class="text-mg1-color">Sun: <span id="rpm_sun">0</span></span>
                             <span class="text-ice-color">Carrier: <span id="rpm_carrier">0</span></span>

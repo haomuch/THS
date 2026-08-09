@@ -1,4 +1,4 @@
-const CACHE_NAME = 'ths-simulator-cache-v3';
+const CACHE_NAME = 'ths-simulator-cache-v4';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -42,30 +42,47 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// 策略：Stale-While-Revalidate（优先返回缓存，同时后台更新）
+// 后台静默更新：不阻塞对页面的响应
+function revalidate(request) {
+  return fetch(request)
+    .then((networkResponse) => {
+      if (
+        networkResponse &&
+        networkResponse.status === 200 &&
+        (networkResponse.type === 'basic' || networkResponse.type === 'cors')
+      ) {
+        return caches.open(CACHE_NAME).then((cache) => cache.put(request, networkResponse.clone()));
+      }
+    })
+    .catch(() => { /* 离线时忽略 */ });
+}
+
+// 策略：Stale-While-Revalidate（先回缓存，再后台刷新）
 self.addEventListener('fetch', (event) => {
-  // 仅拦截 GET 请求与 http/https 协议请求
-  if (event.request.method !== 'GET' || !event.request.url.startsWith('http')) {
+  const request = event.request;
+
+  if (request.method !== 'GET') return;
+
+  // 只接管同源请求，跨域资源直接走浏览器默认通道，避免无谓的 SW 往返
+  let url;
+  try {
+    url = new URL(request.url);
+  } catch (e) {
     return;
   }
+  if (url.origin !== self.location.origin) return;
 
   event.respondWith(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.match(event.request).then((cachedResponse) => {
-        // 发起网络请求获取最新版本
-        const fetchPromise = fetch(event.request)
-          .then((networkResponse) => {
-            // 仅对成功的同源/响应进行缓存更新
-            if (networkResponse && networkResponse.status === 200 && (networkResponse.type === 'basic' || networkResponse.type === 'cors')) {
-              cache.put(event.request, networkResponse.clone());
-            }
-            return networkResponse;
-          })
-          .catch(() => cachedResponse);
-
-        // 如果有缓存优先返回，否则等待网络响应
-        return cachedResponse || fetchPromise;
-      });
+    // caches.match 指定 cacheName，比 caches.open().then(cache.match) 少一次
+    // Promise 跳转；iOS Safari 上每次刷新都要唤醒 SW 线程，这段延迟直接叠加在
+    // 首屏之前，能省则省。
+    caches.match(request, { cacheName: CACHE_NAME }).then((cachedResponse) => {
+      if (cachedResponse) {
+        // 缓存命中：立即回包，更新放到 waitUntil 里跑，不占用响应路径
+        event.waitUntil(revalidate(request));
+        return cachedResponse;
+      }
+      return fetch(request).catch(() => caches.match('./index.html', { cacheName: CACHE_NAME }));
     })
   );
 });

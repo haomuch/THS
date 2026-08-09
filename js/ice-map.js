@@ -11,12 +11,12 @@ export function getMaxTorque(rpm) {
     return 188 - (rpm - 5200) * (10 / 800);
 }
 
+const PEAK_RPM = 2600;
+const PEAK_TORQUE = 125;
+const PEAK_EFF = 0.41; // 41% max
+
 export function getEfficiency(rpm, torque) {
     if (rpm <= 0 || torque <= 0) return 0;
-
-    const PEAK_RPM = 2600;
-    const PEAK_TORQUE = 125;
-    const PEAK_EFF = 0.41; // 41% max
 
     const rpmDist = (rpm - PEAK_RPM) / 6000;
     const torqueDist = (torque - PEAK_TORQUE) / 188;
@@ -35,10 +35,37 @@ export function getEfficiency(rpm, torque) {
 }
 
 /**
- * Pre-renders static ICE efficiency heat map to an offscreen canvas
+ * Packs an #RRGGBB color into a platform-endianness-correct RGBA32 word
+ * so it can be written straight into an ImageData buffer.
+ */
+function packRGBA(hex) {
+    const buf = new ArrayBuffer(4);
+    new Uint8Array(buf).set([
+        parseInt(hex.slice(1, 3), 16),
+        parseInt(hex.slice(3, 5), 16),
+        parseInt(hex.slice(5, 7), 16),
+        255
+    ]);
+    return new Uint32Array(buf)[0];
+}
+
+const C_OUT_OF_BOUNDS = packRGBA('#F3F4F6');
+const C_EFF_40 = packRGBA('#059669');
+const C_EFF_38 = packRGBA('#10B981');
+const C_EFF_35 = packRGBA('#F59E0B');
+const C_EFF_LOW = packRGBA('#EF4444');
+
+/**
+ * Pre-renders static ICE efficiency heat map to an offscreen canvas.
+ *
+ * The heat field is rasterised straight into an ImageData buffer and uploaded
+ * with a single putImageData call. The previous implementation issued
+ * 600 x 400 = 240,000 sub-pixel fillRect calls, which blocked the main thread
+ * for hundreds of milliseconds on mobile Safari and delayed the very first
+ * paint of every canvas on the page.
  */
 export function createIceMapBackground(canvas) {
-    if (!canvas) return null;
+    if (!canvas || !canvas.width || !canvas.height) return null;
     const dpr = window.devicePixelRatio || 1;
     const logicalWidth = canvas.width / dpr;
     const logicalHeight = canvas.height / dpr;
@@ -47,7 +74,6 @@ export function createIceMapBackground(canvas) {
     bgCanvas.width = canvas.width;
     bgCanvas.height = canvas.height;
     const ctx = bgCanvas.getContext('2d');
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     const PADDING_LEFT = 25;
     const PADDING_TOP = 5;
@@ -57,37 +83,61 @@ export function createIceMapBackground(canvas) {
     const ORIGIN_X = PADDING_LEFT;
     const ORIGIN_Y = logicalHeight - PADDING_BOTTOM;
 
-    const R_STEPS = 600;
-    const T_STEPS = 400;
-    const stepR = rpmMax / R_STEPS;
     const W = logicalWidth - PADDING_LEFT;
     const H = logicalHeight - PADDING_BOTTOM - PADDING_TOP;
 
-    const stepT = torqueMax / T_STEPS;
-    const wR = W / R_STEPS + 0.5;
-    const hT = H / T_STEPS + 0.5;
+    // --- Heat field: one ImageData upload instead of 240k fillRect ---
+    const px0 = Math.max(0, Math.round(ORIGIN_X * dpr));
+    const px1 = Math.min(bgCanvas.width, Math.round((ORIGIN_X + W) * dpr));
+    const py0 = Math.max(0, Math.round(PADDING_TOP * dpr));
+    const py1 = Math.min(bgCanvas.height, Math.round(ORIGIN_Y * dpr));
+    const spanX = px1 - px0;
+    const spanY = py1 - py0;
 
-    for (let i = 0; i < R_STEPS; i++) {
-        const r = i * stepR;
-        const maxT = getMaxTorque(r);
+    if (spanX > 0 && spanY > 0) {
+        const img = ctx.createImageData(bgCanvas.width, bgCanvas.height);
+        const pixels = new Uint32Array(img.data.buffer);
+        const stride = bgCanvas.width;
 
-        for (let j = 0; j < T_STEPS; j++) {
-            const t = j * stepT;
-            const x = ORIGIN_X + i * (W / R_STEPS);
-            const y = ORIGIN_Y - ((j + 1) * (H / T_STEPS));
-
-            if (t > maxT) {
-                ctx.fillStyle = '#F3F4F6';
-            } else {
-                const eff = getEfficiency(r, t);
-                if (eff >= 0.40) ctx.fillStyle = '#059669';
-                else if (eff >= 0.38) ctx.fillStyle = '#10B981';
-                else if (eff >= 0.35) ctx.fillStyle = '#F59E0B';
-                else ctx.fillStyle = '#EF4444';
-            }
-            ctx.fillRect(x, y, wR, hT);
+        // Per-column constants (depend on RPM only)
+        const rpmDistSq = new Float64Array(spanX);
+        const rpmPenalty = new Float64Array(spanX);
+        const maxTorque = new Float64Array(spanX);
+        for (let i = 0; i < spanX; i++) {
+            const r = ((i + 0.5) / spanX) * rpmMax;
+            const rd = (r - PEAK_RPM) / rpmMax;
+            rpmDistSq[i] = rd * rd;
+            rpmPenalty[i] = r > 3000 ? 0.01 * ((r - 3000) / 3000) * ((r - 3000) / 3000) : 0;
+            maxTorque[i] = getMaxTorque(r);
         }
+
+        // Per-row constants (depend on torque only)
+        for (let j = 0; j < spanY; j++) {
+            const t = ((spanY - 0.5 - j) / spanY) * torqueMax;
+            const td = (t - PEAK_TORQUE) / 188;
+            const torqueDistSq = td * td;
+            const torquePenalty = t < 40 ? 0.01 * ((40 - t) / 40) * ((40 - t) / 40) : 0;
+
+            let p = (py0 + j) * stride + px0;
+            for (let i = 0; i < spanX; i++, p++) {
+                if (t > maxTorque[i]) {
+                    pixels[p] = C_OUT_OF_BOUNDS;
+                    continue;
+                }
+                const eff = PEAK_EFF
+                    - 0.2 * Math.sqrt(rpmDistSq[i] + torqueDistSq)
+                    - torquePenalty
+                    - rpmPenalty[i];
+                pixels[p] = eff >= 0.40 ? C_EFF_40
+                    : eff >= 0.38 ? C_EFF_38
+                        : eff >= 0.35 ? C_EFF_35
+                            : C_EFF_LOW;
+            }
+        }
+        ctx.putImageData(img, 0, 0);
     }
+
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 
     // Draw Max Torque Line
     ctx.beginPath();
@@ -127,9 +177,14 @@ export function createIceMapBackground(canvas) {
  */
 export function drawIceMap(canvas, bgCanvas, rpm, torque, effElement, cacheRef) {
     if (!canvas || !bgCanvas) return;
+    // The offscreen background must match the current bitmap size, otherwise
+    // drawImage would stretch a stale map over a freshly resized canvas.
+    if (bgCanvas.width !== canvas.width || bgCanvas.height !== canvas.height) return;
     const ctx = canvas.getContext('2d');
 
-    const currentParams = `${rpm.toFixed(1)}_${torque.toFixed(1)}`;
+    // Bitmap size is part of the key: assigning canvas.width/height wipes the
+    // bitmap, so a resize must always force a repaint.
+    const currentParams = `${canvas.width}x${canvas.height}_${rpm.toFixed(1)}_${torque.toFixed(1)}`;
     if (cacheRef && cacheRef.lastIceParams === currentParams) return;
     if (cacheRef) cacheRef.lastIceParams = currentParams;
 

@@ -251,6 +251,21 @@ if ('serviceWorker' in navigator) {
                 startAnimation();
             }
         });
+
+        // `beforeunload` disables the back/forward cache in Safari, which makes
+        // every reload and back navigation a full cold start. The pagehide /
+        // pageshow pair works with bfcache instead.
+        window.addEventListener('pageshow', (e) => {
+            // Fires on the initial load too; only rehydrate when the document
+            // actually came back from the bfcache (animation loop is dead).
+            if (!isInitialized) return;
+            if (!e.persisted && animationFrameId) return;
+            cacheRef.lastIceParams = null;
+            cacheRef.lastLeverState = { n_s: null, n_c: null, n_r: null, t_mg1: null, t_ice: null, t_mg2: null, t_load: null };
+            updatePhysics();
+            if (psdCtx && gearPaths) drawPSD(psdCtx, gearPaths, state);
+            if (!document.hidden) startAnimation();
+        });
     }
 
     function init() {
@@ -283,6 +298,10 @@ if ('serviceWorker' in navigator) {
         if (psdData) {
             psdCtx = psdData.ctx;
             gearPaths = psdData.paths;
+            // Paint one frame synchronously. The gear canvas uses
+            // { alpha: false }, so an untouched bitmap composites as opaque
+            // black; waiting for the first rAF would expose that for a frame.
+            drawPSD(psdCtx, gearPaths, state);
         }
 
         setupEventListeners();
@@ -299,5 +318,15 @@ if ('serviceWorker' in navigator) {
         init();
     }
 
-    window.addEventListener('beforeunload', cleanup);
+    // `unload`/`beforeunload` would opt the page out of the back/forward cache.
+    // Only disconnect the ResizeObserver when the document is actually being
+    // discarded (e.persisted === false); for a bfcache restore we keep the
+    // observer alive so it can react to the new viewport immediately.
+    window.addEventListener('pagehide', (e) => {
+        stopAnimation();
+        if (!e.persisted && resizeObserver) {
+            resizeObserver.disconnect();
+            resizeObserver = null;
+        }
+    });
 })();
