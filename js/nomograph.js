@@ -2,7 +2,7 @@
  * THS Nomograph (Lever Diagram) Visualizer
  */
 
-import { K } from './physics.js';
+// K is now a global from physics.js
 
 function drawAxis(ctx, x, label, color, h) {
     ctx.beginPath();

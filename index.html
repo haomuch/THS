@@ -10,16 +10,14 @@
     <link href="./style.css" rel="stylesheet">
 
     <!--
-      Preload the whole ES module graph.
-      Without this the browser can only discover physics/ice-map/nomograph/psd
-      *after* app.js has been downloaded and parsed, which costs an extra
-      serial round trip before a single pixel of any canvas can be drawn.
+      Load scripts in order.
+      Dependencies must be loaded before app.js.
     -->
-    <link rel="modulepreload" href="./js/app.js">
-    <link rel="modulepreload" href="./js/physics.js">
-    <link rel="modulepreload" href="./js/ice-map.js">
-    <link rel="modulepreload" href="./js/nomograph.js">
-    <link rel="modulepreload" href="./js/psd.js">
+    <script src="./js/physics.js"></script>
+    <script src="./js/ice-map.js"></script>
+    <script src="./js/nomograph.js"></script>
+    <script src="./js/psd.js"></script>
+    <script src="./js/app.js"></script>
 </head>
 
 <body class="p-4 md:p-8 text-gray-800">

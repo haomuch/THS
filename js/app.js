@@ -2,10 +2,7 @@
  * THS Simulator Main Application Controller
  */
 
-import { RATIO_SUN_PLANET, calculatePhysics } from './physics.js';
-import { createIceMapBackground, drawIceMap } from './ice-map.js';
-import { drawNomograph } from './nomograph.js';
-import { initCanvasGears, drawPSD } from './psd.js';
+// Dependencies are now global from scripts loaded in index.html
 
 // Service Worker Registration for Offline Cache
 if ('serviceWorker' in navigator) {

@@ -2,22 +2,22 @@
  * THS Physics & Kinematics Engine
  */
 
-export const K = 2.6; // Ring / Sun teeth ratio
-export const RATIO_SUN_PLANET = 2 / (K - 1); // r_sun / r_planet
-export const FACTOR_KMH_TO_RPM = 25.5;
-export const CONST_9550 = 9550;
+const K = 2.6; // Ring / Sun teeth ratio
+const RATIO_SUN_PLANET = 2 / (K - 1); // r_sun / r_planet
+const FACTOR_KMH_TO_RPM = 25.5;
+const CONST_9550 = 9550;
 
 /**
  * Calculate mechanical power in kW from RPM and Torque (Nm)
  */
-export function calculateSignedPower(rpm, torque) {
+function calculateSignedPower(rpm, torque) {
     return (Math.abs(rpm) * torque) / CONST_9550;
 }
 
 /**
  * Perform THS power split kinematics and dynamic calculations
  */
-export function calculatePhysics(v, n_ice, t_ice, t_load) {
+function calculatePhysics(v, n_ice, t_ice, t_load) {
     // Kinematics
     const n_mg2 = v * FACTOR_KMH_TO_RPM;
     const n_mg1 = (1 + K) * n_ice - K * n_mg2;

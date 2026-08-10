@@ -2,7 +2,7 @@
  * ICE Efficiency Map (M20A-FXS Engine Simulation)
  */
 
-export function getMaxTorque(rpm) {
+function getMaxTorque(rpm) {
     if (rpm < 100) return rpm * (30 / 100);
     if (rpm < 1000) return 30 + (rpm - 100) * (100 / 900);
     if (rpm < 2400) return 130 + (rpm - 1000) * (40 / 1400);
@@ -15,7 +15,7 @@ const PEAK_RPM = 2600;
 const PEAK_TORQUE = 125;
 const PEAK_EFF = 0.41; // 41% max
 
-export function getEfficiency(rpm, torque) {
+function getEfficiency(rpm, torque) {
     if (rpm <= 0 || torque <= 0) return 0;
 
     const rpmDist = (rpm - PEAK_RPM) / 6000;
@@ -64,7 +64,7 @@ const C_EFF_LOW = packRGBA('#EF4444');
  * for hundreds of milliseconds on mobile Safari and delayed the very first
  * paint of every canvas on the page.
  */
-export function createIceMapBackground(canvas) {
+function createIceMapBackground(canvas) {
     if (!canvas || !canvas.width || !canvas.height) return null;
     const dpr = window.devicePixelRatio || 1;
     const logicalWidth = canvas.width / dpr;

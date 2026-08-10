@@ -2,7 +2,7 @@
  * PSD (Power Split Device) Planetary Gear Visualization
  */
 
-import { K } from './physics.js';
+// K is now a global from physics.js
 
 const TO_RAD = Math.PI / 180;
 
@@ -36,7 +36,7 @@ function makePath(toothCount, pitchR, isInternal, holeR) {
     return path;
 }
 
-export function initCanvasGears(canvas) {
+function initCanvasGears(canvas) {
     if (!canvas) return null;
     const dpr = window.devicePixelRatio || 1;
     const logicalSize = 240;
@@ -93,7 +93,7 @@ export function initCanvasGears(canvas) {
     };
 }
 
-export function drawPSD(psdCtx, gearPaths, state) {
+function drawPSD(psdCtx, gearPaths, state) {
     if (!psdCtx || !gearPaths) return;
     const ctx = psdCtx;
     const dpr = gearPaths.dpr;
