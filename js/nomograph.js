@@ -99,7 +99,7 @@ function drawStaticNomograph(ctx, w, h) {
     drawAxis(ctx, x_mg2, 'Ring (MG2)', '#10B981', h);
 }
 
-export function drawNomograph(canvas, n_s, n_c, n_r, t_mg1, t_ice, t_mg2, t_load, cacheRef) {
+function drawNomograph(canvas, n_s, n_c, n_r, t_mg1, t_ice, t_mg2, t_load, cacheRef) {
     if (!canvas || canvas.width === 0 || canvas.height === 0) return;
     const ctx = canvas.getContext('2d');
     const w = canvas.width;

@@ -175,7 +175,7 @@ function createIceMapBackground(canvas) {
 /**
  * Renders ICE Map canvas with current operating point marker
  */
-export function drawIceMap(canvas, bgCanvas, rpm, torque, effElement, cacheRef) {
+function drawIceMap(canvas, bgCanvas, rpm, torque, effElement, cacheRef) {
     if (!canvas || !bgCanvas) return;
     // The offscreen background must match the current bitmap size, otherwise
     // drawImage would stretch a stale map over a freshly resized canvas.
