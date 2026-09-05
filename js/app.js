@@ -41,6 +41,10 @@ if ('serviceWorker' in navigator) {
     let psdCtx = null;
     let gearPaths = null;
     let animationFrameId = null;
+    // 上一渲染帧的时间戳（用于按真实时间步进），null 表示停表状态。
+    let lastFrameTimestamp = null;
+    // 输入事件合并标志：为 true 时在下一个渲染帧统一执行重算/重绘。
+    let renderDirty = false;
     let resizeObserver = null;
     let isInitialized = false;
 
@@ -164,39 +168,76 @@ if ('serviceWorker' in navigator) {
             if (el) {
                 el.addEventListener('input', (e) => {
                     updateInputDisplay(e.target);
-                    updatePhysics();
+                    // 仅标记脏数据，实际重算/重绘合并到下一渲染帧（问题3）。
+                    renderDirty = true;
+                    scheduleFrame();
                 }, { passive: true });
             }
         });
     }
 
     const scale = 0.01;
-    const fixedDt = 1 / 60;
+    // 单帧允许的最大模拟时长（秒）。防止调试器暂停/系统卡顿后把停表时间
+    // 一次性补进角度导致跳变；30fps 低刷屏的正常帧间隔不受影响。
+    const MAX_FRAME_DT = 0.1;
 
-    function animate() {
-        state.ang_sun += (state.n_mg1 / 60 * 360 * fixedDt) * scale;
-        state.ang_carrier += (state.n_ice / 60 * 360 * fixedDt) * scale;
-        state.ang_ring += (state.n_mg2 / 60 * 360 * fixedDt) * scale;
-
-        const rpm_planet_rel = (state.n_mg1 - state.n_ice) * (-RATIO_SUN_PLANET);
-        state.ang_planet += (rpm_planet_rel / 60 * 360 * fixedDt) * scale;
-
-        drawPSD(psdCtx, gearPaths, state);
-
-        animationFrameId = requestAnimationFrame(animate);
+    /**
+     * 齿轮是否处于旋转状态。只有三轴转速全为 0 时 PSD 画面才完全静止，
+     * 此时无需再排动画帧（问题1：消除无谓空转）。
+     */
+    function hasAngularMotion() {
+        return state.n_mg1 !== 0 || state.n_ice !== 0 || state.n_mg2 !== 0;
     }
 
-    function startAnimation() {
-        if (!animationFrameId) {
-            animationFrameId = requestAnimationFrame(animate);
+    function renderFrame(timestamp) {
+        // 1) 用真实帧间隔步进模拟（问题2：与 60/90/120/144Hz 刷新率解耦）。
+        //    首帧或从停表恢复时 dt=0，避免把停滞期时间一次补进角度。
+        const dt = (lastFrameTimestamp === null)
+            ? 0
+            : Math.min((timestamp - lastFrameTimestamp) / 1000, MAX_FRAME_DT);
+        lastFrameTimestamp = timestamp;
+
+        // 2) 输入合并：同一帧内所有 slider/resize 事件只重算与重绘一次（问题3）。
+        if (renderDirty) {
+            renderDirty = false;
+            updatePhysics();
+        }
+
+        // 3) PSD 齿轮动画：仅在存在转速时才推进角度并重绘。
+        const moving = hasAngularMotion();
+        if (moving) {
+            state.ang_sun += (state.n_mg1 / 60 * 360 * dt) * scale;
+            state.ang_carrier += (state.n_ice / 60 * 360 * dt) * scale;
+            state.ang_ring += (state.n_mg2 / 60 * 360 * dt) * scale;
+
+            const rpm_planet_rel = (state.n_mg1 - state.n_ice) * (-RATIO_SUN_PLANET);
+            state.ang_planet += (rpm_planet_rel / 60 * 360 * dt) * scale;
+
+            drawPSD(psdCtx, gearPaths, state);
+        }
+
+        // 4) 运动时持续排帧；完全静止则停表挂起，避免持续全量重绘。
+        if (moving) {
+            animationFrameId = requestAnimationFrame(renderFrame);
+        } else {
+            animationFrameId = null;
+            lastFrameTimestamp = null;
+        }
+    }
+
+    /** 排入一个渲染帧；若已有待执行帧或动画在跑则直接合并，避免重复排队。 */
+    function scheduleFrame() {
+        if (animationFrameId === null) {
+            animationFrameId = requestAnimationFrame(renderFrame);
         }
     }
 
     function stopAnimation() {
-        if (animationFrameId) {
+        if (animationFrameId !== null) {
             cancelAnimationFrame(animationFrameId);
             animationFrameId = null;
         }
+        lastFrameTimestamp = null;
     }
 
     function setupResponsiveCanvas() {
@@ -224,7 +265,9 @@ if ('serviceWorker' in navigator) {
                 }
 
                 if (needsUpdate) {
-                    updatePhysics();
+                    // 尺寸变更后统一在下一渲染帧重算与重绘。
+                    renderDirty = true;
+                    scheduleFrame();
                 }
             });
         });
@@ -245,7 +288,8 @@ if ('serviceWorker' in navigator) {
             if (document.hidden) {
                 stopAnimation();
             } else {
-                startAnimation();
+                // 回到前台：若有转速，渲染帧会持续推进；静止则自然挂起。
+                scheduleFrame();
             }
         });
 
@@ -259,9 +303,8 @@ if ('serviceWorker' in navigator) {
             if (!e.persisted && animationFrameId) return;
             cacheRef.lastIceParams = null;
             cacheRef.lastLeverState = { n_s: null, n_c: null, n_r: null, t_mg1: null, t_ice: null, t_mg2: null, t_load: null };
-            updatePhysics();
-            if (psdCtx && gearPaths) drawPSD(psdCtx, gearPaths, state);
-            if (!document.hidden) startAnimation();
+            renderDirty = true;
+            scheduleFrame();
         });
     }
 
@@ -305,8 +348,12 @@ if ('serviceWorker' in navigator) {
         setupResponsiveCanvas();
         setupPageVisibilityHandling();
 
+        // 首帧同步渲染静态内容（数值文本、nomograph、ICE MAP），避免等待 rAF。
         updatePhysics();
-        startAnimation();
+        // 初始输入全为 0（无转速），齿轮静止，无需启动渲染循环。
+        if (hasAngularMotion()) {
+            scheduleFrame();
+        }
     }
 
     if (document.readyState === 'loading') {
