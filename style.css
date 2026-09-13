@@ -934,6 +934,26 @@ body {
   min-height: 100vh;
 }
 
+/*
+ * Range slider geometry.
+ * The <input> itself is 0.5rem (8px) tall (`h-2`) and paints the colored bar
+ * via its own background. The track pseudo-elements are pinned to that same
+ * 8px and made transparent so the bar is drawn exactly once. Because the track
+ * height equals the input height, the track's top edge always coincides with
+ * the input's top edge, which makes the thumb offset deterministic:
+ *   offset = (thumb 16px - track 8px) / 2 = 4px  ->  margin-top: -4px
+ */
+.slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.slider-thumb::-webkit-slider-runnable-track {
+  height: 0.5rem;
+  border-radius: 0.5rem;
+  background: transparent;
+}
+
 .slider-thumb::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
@@ -943,12 +963,19 @@ body {
   background: currentColor;
   cursor: grab;
   box-shadow: 0 0 5px rgba(0, 0, 0, 0.2);
-  margin-top: -6px;
+  margin-top: -4px;
+}
+
+.slider-thumb::-moz-range-track {
+  height: 0.5rem;
+  border-radius: 0.5rem;
+  background: transparent;
 }
 
 .slider-thumb::-moz-range-thumb {
   width: 16px;
   height: 16px;
+  border: none;
   border-radius: 50%;
   background: currentColor;
   cursor: grab;
