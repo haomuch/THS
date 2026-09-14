@@ -929,11 +929,30 @@ video {
   }
 }
 
+/*
+ * 严格水平居中：以「浏览器窗口」为基准，而不是被滚动条挤压后的可视区。
+ *
+ * 1) scrollbar-gutter: stable —— 滚动条槽位常驻。
+ *    无论文档当前是否需要滚动（含弹窗打开时锁定滚动），html 的内容宽度
+ *    都恒为「窗口宽 − 滚动条宽」，内容宽度与位置不再发生跳变。
+ *
+ * 2) body 的左外边距 = 100vw − 100% = 滚动条宽度 sb。
+ *    100vw 含滚动条，百分比 100% 解析自 html 的内容宽度（不含滚动条），
+ *    两者之差正好是 sb。让出 sb 后 body 占据 [sb, W − sb]：
+ *        左边缘 = sb，宽 = W − 2sb  →  中心 = sb + (W − 2sb)/2 = W/2
+ *    即容器中心恒等于窗口中心线 W/2；sb 为 0（覆盖式滚动条 / 无滚动条）
+ *    时该外边距自动归零，同样成立。
+ */
+html {
+  scrollbar-gutter: stable;
+}
+
 /* Custom Application Styles */
 body {
   font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   background-color: #f7f7f7;
   min-height: 100vh;
+  margin-left: calc(100vw - 100%);
 }
 
 /*
@@ -1096,6 +1115,13 @@ canvas {
 
 .help-dialog {
   width: min(46rem, calc(100vw - 2rem));
+  /*
+   * 固定定位元素的百分比解析自 ICB（不含滚动条），默认的 margin:auto 只会把它
+   * 居中在「可视区」。按窗口中心直接算出左外边距（左边缘 = 100vw/2 − 宽度/2），
+   * 与 body 的居中基准保持一致；右侧 auto 吸收剩余空间。
+   */
+  margin-left: calc(50vw - (min(46rem, calc(100vw - 2rem)) / 2));
+  margin-right: auto;
   padding: 0;
   border: none;
   border-radius: 0.75rem;
