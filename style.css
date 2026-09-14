@@ -1028,6 +1028,29 @@ canvas {
   stroke-linecap: round;
 }
 
+/*
+ * 标题行：声明为容器查询容器，使标题能按「可用宽度」而非视口宽度缩放。
+ * 这样右侧的“?”按钮所占的 24px + 8px 间距会被精确扣掉。
+ */
+.title-row {
+  container-type: inline-size;
+}
+
+.app-title {
+  min-width: 0;
+  line-height: 1.25;
+
+  /* 回退：不支持容器查询单位的浏览器使用视口单位 */
+  font-size: clamp(1rem, 4.2vw, 1.875rem);
+
+  /*
+   * 标题 “THS功率分流混动架构模拟器” 宽度约 13em（3 个拉丁字母 + 11 个全角汉字），
+   * 取 14 留出安全余量；再减去按钮 1.5rem 与 gap 0.5rem，
+   * 即可保证在任何宽度下都与按钮同排完整显示，不挤压、不换行。
+   */
+  font-size: clamp(0.9rem, calc((100cqw - 2rem) / 14), 1.875rem);
+}
+
 /* ===== 标题旁的说明入口按钮 ===== */
 .help-btn {
   flex-shrink: 0;
