@@ -60,7 +60,8 @@ if ('serviceWorker' in navigator) {
             'p_ice_disp', 'bar_ice', 'p_wheel_disp', 'bar_wheel_pos', 'bar_wheel_neg',
             'p_batt_disp', 'bar_batt_dis', 'bar_batt_chg', 'p_mg1_disp', 'mg1_state_text',
             'p_mg2_disp', 'mg2_state_text', 'current_efficiency', 'ice_map_canvas',
-            'nomograph_canvas', 'psd_canvas'
+            'nomograph_canvas', 'psd_canvas',
+            'help_btn', 'help_dialog', 'help_close'
         ];
 
         elementIds.forEach(id => {
@@ -240,6 +241,41 @@ if ('serviceWorker' in navigator) {
         lastFrameTimestamp = null;
     }
 
+    /**
+     * 标题旁的 "?" 说明弹窗。
+     * 使用原生 <dialog>.showModal()：自带顶层渲染、焦点陷阱与 Esc 关闭；
+     * 不支持 showModal 的老浏览器退化为切换 open 属性。
+     */
+    function setupHelpModal() {
+        const dialog = elements.help_dialog;
+        const trigger = elements.help_btn;
+        const closeBtn = elements.help_close;
+        if (!dialog || !trigger) return;
+
+        trigger.addEventListener('click', () => {
+            if (typeof dialog.showModal === 'function') {
+                dialog.showModal();
+            } else {
+                dialog.setAttribute('open', '');
+            }
+            document.body.classList.add('modal-open');
+        });
+
+        if (closeBtn) {
+            closeBtn.addEventListener('click', () => dialog.close());
+        }
+
+        // 点击内容区以外的遮罩关闭（遮罩上的点击，target 就是 dialog 本身）
+        dialog.addEventListener('click', (e) => {
+            if (e.target === dialog) dialog.close();
+        });
+
+        // 统一在 close 事件里解锁背景滚动，覆盖 Esc 关闭等所有路径
+        dialog.addEventListener('close', () => {
+            document.body.classList.remove('modal-open');
+        });
+    }
+
     function setupResponsiveCanvas() {
         const nomographCanvas = elements.nomograph_canvas;
         const iceMapCanvas = elements.ice_map_canvas;
@@ -345,6 +381,7 @@ if ('serviceWorker' in navigator) {
         }
 
         setupEventListeners();
+        setupHelpModal();
         setupResponsiveCanvas();
         setupPageVisibilityHandling();
 

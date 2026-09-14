@@ -24,8 +24,19 @@
 
     <div class="max-w-7xl mx-auto bg-white shadow-xl rounded-xl p-6 md:p-4">
         <header class="mb-3 border-b pb-2">
-            <h1 class="font-bold text-gray-900 whitespace-nowrap" style="font-size: clamp(1.2rem, 5.8vw, 1.875rem);">
-                THS功率分流混动架构模拟器</h1>
+            <div class="flex items-center gap-2">
+                <h1 class="font-bold text-gray-900" style="font-size: clamp(1.2rem, 5.8vw, 1.875rem);">
+                    THS功率分流混动架构模拟器</h1>
+                <button type="button" id="help_btn" class="help-btn" title="查看说明" aria-label="查看说明"
+                    aria-haspopup="dialog" aria-controls="help_dialog">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <circle cx="12" cy="12" r="10" />
+                        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                        <path d="M12 17h.01" />
+                    </svg>
+                </button>
+            </div>
         </header>
 
         <div class="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -43,6 +54,7 @@
                         <span class="text-sm font-bold text-mg2-color"><span id="v_val">0</span> km/h</span>
                     </div>
                     <input type="range" id="v_input" min="-20" max="180" step="1" value="0"
+                        aria-label="车速 (Vehicle Speed)"
                         class="w-full h-2 bg-mg2-color/20 rounded-lg slider-thumb text-mg2-color">
                 </div>
 
@@ -53,6 +65,7 @@
                         <span class="text-sm font-bold text-ice-color"><span id="nice_val">0</span> RPM</span>
                     </div>
                     <input type="range" id="nice_input" min="0" max="6000" step="10" value="0"
+                        aria-label="发动机转速 (ICE RPM)"
                         class="w-full h-2 bg-ice-color/20 rounded-lg slider-thumb text-ice-color">
                 </div>
 
@@ -63,6 +76,7 @@
                         <span class="text-sm font-bold text-ice-color"><span id="tice_val">0</span> Nm</span>
                     </div>
                     <input type="range" id="tice_input" min="0" max="188" step="1" value="0"
+                        aria-label="发动机扭矩 (ICE Torque)"
                         class="w-full h-2 bg-ice-color/20 rounded-lg slider-thumb text-ice-color">
                 </div>
 
@@ -73,6 +87,7 @@
                         <span class="text-sm font-bold text-gray-700"><span id="tload_val">0</span> Nm</span>
                     </div>
                     <input type="range" id="tload_input" min="-700" max="700" step="1" value="0"
+                        aria-label="负载扭矩 (Load Torque)"
                         class="w-full h-2 bg-gray-300 rounded-lg slider-thumb text-gray-600">
                     <p class="text-xs text-gray-400">正值=爬坡/加速阻力，负值=下坡/制动回收</p>
                 </div>
@@ -213,6 +228,192 @@
             </p>
         </footer>
     </div>
+
+    <!-- 说明弹窗：内容取自 README 的核心说明部分 -->
+    <dialog id="help_dialog" class="help-dialog" aria-labelledby="help_title">
+        <div class="help-dialog__inner">
+            <div class="help-dialog__head">
+                <h2 id="help_title" class="help-dialog__title">使用说明</h2>
+                <button type="button" id="help_close" class="help-dialog__close" aria-label="关闭说明">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                        <path d="M18 6 6 18" />
+                        <path d="m6 6 12 12" />
+                    </svg>
+                </button>
+            </div>
+
+            <div class="help-dialog__body">
+                <p>本模拟器通过单行星齿轮机构（PSD）把<strong>发动机 (ICE)</strong>、<strong>MG1</strong>、<strong>MG2
+                        / 车轮</strong>机械耦合在一起，可实时观察转速约束、扭矩分流、功率流与能量回收，并内置 M20A-FXS
+                    发动机热效率 MAP。</p>
+
+                <h3>驾驶员输入 (Driver Inputs)</h3>
+                <table class="help-table">
+                    <thead>
+                        <tr>
+                            <th>参数</th>
+                            <th>范围</th>
+                            <th>说明</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>车速</td>
+                            <td>-20 ~ 180 km/h</td>
+                            <td>支持倒车与高速巡航</td>
+                        </tr>
+                        <tr>
+                            <td>发动机转速</td>
+                            <td>0 ~ 6000 rpm</td>
+                            <td>—</td>
+                        </tr>
+                        <tr>
+                            <td>发动机扭矩</td>
+                            <td>0 ~ 188 N·m</td>
+                            <td>—</td>
+                        </tr>
+                        <tr>
+                            <td>负载扭矩</td>
+                            <td>-700 ~ 700 N·m</td>
+                            <td>正值 = 爬坡 / 加速阻力；负值 = 下坡 / 制动回收</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>ICE 热效率 MAP (M20A-FXS)</h3>
+                <ul>
+                    <li>模拟 2.0L 自然吸气发动机，峰值热效率约 <strong>41%</strong></li>
+                    <li>分区配色：深绿 ≥ 40%、浅绿 38–40%、黄色 35–38%、红色 &lt; 35%</li>
+                    <li>工作点：实心圆点指示当前 (转速, 扭矩)；超出发动机外特性（虚线）时置灰并提示</li>
+                </ul>
+
+                <h3>THS 杠杆图 (Nomograph)</h3>
+                <ul>
+                    <li>三轴间距按【太阳轮–行星架 : 行星架–齿圈 = K : 1】排布</li>
+                    <li>倾斜直线直观展示 MG1 / ICE / MG2 的转速约束关系</li>
+                    <li>实时箭头展示各轴扭矩方向与大小（MG1 支撑力矩、ICE 驱动力矩、MG2 补充力矩、Load 负载力矩）</li>
+                </ul>
+
+                <h3>PSD 行星齿轮动画</h3>
+                <ul>
+                    <li>Canvas 实时渲染太阳轮、3 个行星轮、行星架与外齿圈</li>
+                    <li>动画转速按 <strong>1/100</strong> 缩放以便观察</li>
+                </ul>
+
+                <h3>功率流与状态指示</h3>
+                <ul>
+                    <li><strong>发动机 / 车轮 / 电池功率</strong>条形图：车轮与电池为双向显示（驱动为正、回收 /
+                        充电为负）</li>
+                    <li><strong>MG1 / MG2 状态卡</strong>：自动识别 Idle、Motoring (驱动)、Generating
+                        (发电)，并显示峰值功率占比与 Overload 提示</li>
+                </ul>
+
+                <h3>PSD 耦合关系</h3>
+                <table class="help-table">
+                    <thead>
+                        <tr>
+                            <th>构件</th>
+                            <th>连接对象</th>
+                            <th>作用</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>太阳轮 (Sun)</td>
+                            <td>MG1</td>
+                            <td>发电 / 调节发动机转速</td>
+                        </tr>
+                        <tr>
+                            <td>行星架 (Carrier)</td>
+                            <td>发动机 (ICE)</td>
+                            <td>动力输入</td>
+                        </tr>
+                        <tr>
+                            <td>齿圈 (Ring)</td>
+                            <td>MG2 → 车轮</td>
+                            <td>驱动 / 能量回收</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>符号约定</h3>
+                <table class="help-table">
+                    <thead>
+                        <tr>
+                            <th>符号</th>
+                            <th>含义</th>
+                            <th>单位</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr>
+                            <td>v</td>
+                            <td>车速</td>
+                            <td>km/h</td>
+                        </tr>
+                        <tr>
+                            <td>N<sub>ICE</sub></td>
+                            <td>发动机（行星架）转速</td>
+                            <td>rpm</td>
+                        </tr>
+                        <tr>
+                            <td>N<sub>MG1</sub></td>
+                            <td>MG1（太阳轮）转速</td>
+                            <td>rpm</td>
+                        </tr>
+                        <tr>
+                            <td>N<sub>MG2</sub></td>
+                            <td>MG2（齿圈 / 车轮）转速</td>
+                            <td>rpm</td>
+                        </tr>
+                        <tr>
+                            <td>T<sub>ICE</sub></td>
+                            <td>发动机扭矩</td>
+                            <td>N·m</td>
+                        </tr>
+                        <tr>
+                            <td>T<sub>load</sub></td>
+                            <td>车轮负载扭矩</td>
+                            <td>N·m</td>
+                        </tr>
+                        <tr>
+                            <td>K</td>
+                            <td>齿圈与太阳轮齿数比 Z<sub>r</sub> / Z<sub>s</sub></td>
+                            <td>—</td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h3>1. 运动学约束 (Kinematics)</h3>
+                <p>三轴转速由行星排方程约束，在杠杆图上表现为一条直线：</p>
+                <div class="help-formula">N<sub>MG1</sub> = (1 + K) · N<sub>ICE</sub> − K · N<sub>MG2</sub>, &nbsp; K =
+                    Z<sub>r</sub> / Z<sub>s</sub> = 2.6</div>
+                <ul>
+                    <li>N<sub>MG2</sub> = 25.5 · v：车速（km/h）换算为齿圈转速（rpm）</li>
+                    <li>N<sub>MG1</sub> &gt; 0 为正转；N<sub>MG1</sub> &lt; 0 为反转（倒拖发电区间）</li>
+                </ul>
+
+                <h3>2. 转矩平衡 (Torque Balance)</h3>
+                <p>发动机扭矩 T<sub>ICE</sub> 按杠杆比例分流至太阳轮与齿圈：</p>
+                <div class="help-formula">T<sub>sun</sub> = T<sub>ICE</sub> / (1 + K), &nbsp; T<sub>ring</sub> = K ·
+                    T<sub>ICE</sub> / (1 + K)</div>
+                <p>MG1 施加反作用力矩支撑发动机输出，MG2 补偿剩余的行驶负载：</p>
+                <div class="help-formula">T<sub>MG1</sub> = −T<sub>sun</sub>, &nbsp; T<sub>MG2</sub> = T<sub>load</sub> −
+                    T<sub>ring</sub></div>
+
+                <h3>3. 功率与电池平衡 (Power Balance)</h3>
+                <p>由转速与扭矩换算功率（N 为 rpm、T 为 N·m、P 为 kW）：</p>
+                <div class="help-formula">P<sub>ICE</sub> = N<sub>ICE</sub> · T<sub>ICE</sub> / 9550, &nbsp;
+                    P<sub>wheel</sub> = |N<sub>MG2</sub>| · T<sub>load</sub> / 9550, &nbsp; P<sub>batt</sub> =
+                    P<sub>MG1</sub> + P<sub>MG2</sub></div>
+                <ul>
+                    <li>P<sub>batt</sub> &gt; 0：电池处于<strong>放电</strong>状态，电机补充驱动力</li>
+                    <li>P<sub>batt</sub> &lt; 0：电池处于<strong>充电</strong>状态，发动机多余功率发电或制动能量回收</li>
+                </ul>
+            </div>
+        </div>
+    </dialog>
 </body>
 
 </html>

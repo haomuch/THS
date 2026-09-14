@@ -142,6 +142,8 @@ html,
   /* 1 */
   -webkit-text-size-adjust: 100%;
   /* 2 */
+  text-size-adjust: 100%;
+  /* 2 */
   -moz-tab-size: 4;
   /* 3 */
   tab-size: 4;
@@ -1024,4 +1026,199 @@ canvas {
 
 .gear-tooth {
   stroke-linecap: round;
+}
+
+/* ===== 标题旁的说明入口按钮 ===== */
+.help-btn {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 1px solid #e5e7eb;
+  border-radius: 9999px;
+  background-color: #f9fafb;
+  color: #9ca3af;
+  transition: color 0.15s ease, background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.help-btn:hover {
+  background-color: #eef2ff;
+  border-color: #c7d2fe;
+  color: #4f46e5;
+}
+
+.help-btn:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}
+
+.help-btn svg {
+  width: 0.95rem;
+  height: 0.95rem;
+}
+
+/* ===== 说明弹窗 ===== */
+/*
+ * `<dialog>` 使用原生 showModal()，自带顶层渲染、焦点陷阱与 Esc 关闭。
+ * 注意：不能给 .help-dialog 设置 display，UA 的 `dialog:not([open]) { display: none }`
+ * 在作者样式面前优先级始终更低，一旦覆盖会导致弹窗常显。
+ */
+/* 不支持 <dialog> 的浏览器兜底（内容与 UA 默认行为一致，现代浏览器无影响） */
+.help-dialog:not([open]) {
+  display: none;
+}
+
+.help-dialog {
+  width: min(46rem, calc(100vw - 2rem));
+  padding: 0;
+  border: none;
+  border-radius: 0.75rem;
+  background-color: #fff;
+  color: #1f2937;
+  box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.3);
+}
+
+.help-dialog::backdrop {
+  background-color: rgb(17 24 39 / 0.55);
+}
+
+.help-dialog__inner {
+  display: flex;
+  flex-direction: column;
+}
+
+.help-dialog__head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.875rem 1.25rem;
+  border-bottom: 1px solid #e5e7eb;
+}
+
+.help-dialog__title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.help-dialog__close {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  border: none;
+  border-radius: 0.375rem;
+  background-color: transparent;
+  color: #9ca3af;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.help-dialog__close:hover {
+  background-color: #f3f4f6;
+  color: #111827;
+}
+
+.help-dialog__close:focus-visible {
+  outline: 2px solid #6366f1;
+  outline-offset: 2px;
+}
+
+.help-dialog__close svg {
+  width: 1.125rem;
+  height: 1.125rem;
+}
+
+.help-dialog__body {
+  padding: 1rem 1.25rem 1.25rem;
+  max-height: min(68vh, 32rem);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.help-dialog__body h3 {
+  margin: 1.25rem 0 0.5rem;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.help-dialog__body p {
+  margin: 0 0 0.5rem;
+  font-size: 0.875rem;
+  line-height: 1.7;
+  color: #374151;
+}
+
+.help-dialog__body ul {
+  margin: 0 0 0.5rem;
+  padding-left: 1.125rem;
+  list-style: disc;
+}
+
+.help-dialog__body li {
+  margin-bottom: 0.25rem;
+  font-size: 0.875rem;
+  line-height: 1.7;
+  color: #374151;
+}
+
+.help-dialog__body strong {
+  font-weight: 700;
+  color: #111827;
+}
+
+.help-table {
+  width: 100%;
+  margin: 0 0 0.5rem;
+  border-collapse: collapse;
+  font-size: 0.8125rem;
+}
+
+.help-table th,
+.help-table td {
+  padding: 0.375rem 0.625rem;
+  border: 1px solid #e5e7eb;
+  text-align: left;
+  vertical-align: top;
+}
+
+.help-table th {
+  background-color: #f9fafb;
+  font-weight: 600;
+  color: #374151;
+  white-space: nowrap;
+}
+
+/*
+ * 公式区：等宽字体保证下标对齐；nowrap + overflow-x 让超长公式在窄屏可横向滑动，
+ * 而不是把弹窗撑宽或把算式折行。
+ */
+.help-formula {
+  margin: 0.5rem 0 0.75rem;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid #e5e7eb;
+  border-radius: 0.5rem;
+  background-color: #f9fafb;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.8125rem;
+  line-height: 1.9;
+  color: #1f2937;
+  white-space: nowrap;
+  overflow-x: auto;
+}
+
+.help-formula sub {
+  font-size: 70%;
+}
+
+/* 弹窗打开时锁定背景滚动 */
+body.modal-open {
+  overflow: hidden;
 }
