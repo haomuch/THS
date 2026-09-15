@@ -1267,6 +1267,16 @@ canvas {
   font-size: 70%;
 }
 
+/* 补充说明：区别于正文的浅色提示块 */
+.help-note {
+  margin: 0.25rem 0 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-left: 3px solid #9ca3af;
+  border-radius: 0 0.375rem 0.375rem 0;
+  background-color: #f9fafb;
+  color: #4b5563;
+}
+
 /* 弹窗打开时锁定背景滚动 */
 body.modal-open {
   overflow: hidden;

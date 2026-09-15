@@ -13,7 +13,7 @@
 | 车速 (Vehicle Speed) | -20 ~ 180 km/h | 支持倒车与高速巡航 |
 | 发动机转速 (ICE RPM) | 0 ~ 6000 rpm | |
 | 发动机扭矩 (ICE Torque) | 0 ~ 188 N·m | |
-| 负载扭矩 (Load Torque) | -700 ~ 700 N·m | 正值 = 爬坡 / 加速阻力；负值 = 下坡 / 制动回收 |
+| 负载扭矩 (Load Torque) | -700 ~ 700 N·m | **齿圈处的负载扭矩**（已按主减速比折算，非车轮端扭矩）；正值 = 爬坡 / 加速阻力；负值 = 下坡 / 制动回收 |
 
 ### ICE 热效率 MAP (M20A-FXS)
 
@@ -56,9 +56,9 @@
 | $v$ | 车速 | km/h |
 | $N_{\text{ICE}}$ | 发动机（行星架）转速 | rpm |
 | $N_{\text{MG1}}$ | MG1（太阳轮）转速 | rpm |
-| $N_{\text{MG2}}$ | MG2（齿圈 / 车轮）转速 | rpm |
+| $N_{\text{MG2}}$ | MG2（齿圈）转速，与车速成正比 | rpm |
 | $T_{\text{ICE}}$ | 发动机扭矩 | N·m |
-| $T_{\text{load}}$ | 车轮负载扭矩 | N·m |
+| $T_{\text{load}}$ | 齿圈负载扭矩（折算值） | N·m |
 | $K$ | 齿圈与太阳轮齿数比 $Z_r / Z_s$ | — |
 
 ### 1. 运动学约束 (Kinematics)
@@ -80,12 +80,15 @@ MG1 施加反作用力矩以支撑发动机输出，MG2 补偿剩余的行驶负
 
 $$T_{\text{MG1}} = -T_{\text{sun}}, \qquad T_{\text{MG2}} = T_{\text{load}} - T_{\text{ring}}$$
 
+> **注意**：$T_{\text{load}}$ 是**折算到齿圈（Ring）侧**的负载扭矩，与杠杆图 Ring 轴上的 `Load` 箭头对应，**不是车轮终端扭矩**。二者差一个主减速比 $i_f$：车轮端扭矩 $= i_f\,T_{\text{load}}$，而 $i_f$ 已隐含在 $N_{\text{MG2}} = 25.5\,v$ 的车速换算中。
+
 ### 3. 功率与电池平衡 (Power Balance)
 
 由转速与扭矩换算功率（$N$ 为 rpm、$T$ 为 N·m、$P$ 为 kW）：
 
 $$P_{\text{ICE}} = \frac{N_{\text{ICE}}\,T_{\text{ICE}}}{9550}, \quad P_{\text{wheel}} = \frac{|N_{\text{MG2}}|\,T_{\text{load}}}{9550}, \quad P_{\text{batt}} = P_{\text{MG1}} + P_{\text{MG2}}$$
 
+- 因为扭矩与转速取自同一根轴（齿圈），$P_{\text{wheel}}$ 即**齿圈侧输出功率**；忽略传动损耗时它等于车轮端功率（功率经主减速比不变，变的只是扭矩）
 - $P_{\text{batt}} > 0$：电池处于**放电**状态，电机补充驱动力
 - $P_{\text{batt}} < 0$：电池处于**充电**状态，发动机多余功率发电或制动能量回收
 
