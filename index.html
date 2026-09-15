@@ -275,7 +275,7 @@
                         <tr>
                             <td>负载扭矩</td>
                             <td>-700 ~ 700 N·m</td>
-                            <td><strong>齿圈处的负载扭矩</strong>（已按主减速比折算，非车轮端扭矩）；正值 = 爬坡 / 加速阻力；负值 = 下坡 / 制动回收</td>
+                            <td><strong>齿圈负载扭矩</strong>：正值 = 爬坡 / 加速阻力；负值 = 下坡 / 制动回收</td>
                         </tr>
                     </tbody>
                 </table>
@@ -400,9 +400,9 @@
                 <p>MG1 施加反作用力矩支撑发动机输出，MG2 补偿剩余的行驶负载：</p>
                 <div class="help-formula">T<sub>MG1</sub> = −T<sub>sun</sub>, &nbsp; T<sub>MG2</sub> = T<sub>load</sub> −
                     T<sub>ring</sub></div>
-                <p class="help-note">注意：T<sub>load</sub> 是<strong>折算到齿圈（Ring）侧</strong>的负载扭矩，与杠杆图 Ring
+                <p class="help-note">注意：T<sub>load</sub> 是<strong>折算到齿圈（Ring）</strong>的负载扭矩，与杠杆图 Ring
                     轴上的 Load 箭头对应，<strong>不是车轮终端扭矩</strong>。二者相差一个主减速比 i<sub>f</sub>：车轮端扭矩 = i<sub>f</sub> ·
-                    T<sub>load</sub>，而 i<sub>f</sub> 已隐含在 N<sub>MG2</sub> = 25.5 · v 的车速换算中。</p>
+                    T<sub>load</sub>，而 i<sub>f</sub> 约等于3。</p>
 
                 <h3>3. 功率与电池平衡 (Power Balance)</h3>
                 <p>由转速与扭矩换算功率（N 为 rpm、T 为 N·m、P 为 kW）：</p>
@@ -410,7 +410,7 @@
                     P<sub>wheel</sub> = |N<sub>MG2</sub>| · T<sub>load</sub> / 9550, &nbsp; P<sub>batt</sub> =
                     P<sub>MG1</sub> + P<sub>MG2</sub></div>
                 <ul>
-                    <li>扭矩与转速取自同一根轴（齿圈），故 P<sub>wheel</sub> 为<strong>齿圈侧输出功率</strong>；忽略传动损耗时等于车轮端功率（经主减速比功率不变，只有扭矩变化）</li>
+                    <li>P<sub>wheel</sub> 为<strong>齿圈侧输出功率</strong>，忽略传动损耗时等于车轮端功率</li>
                     <li>P<sub>batt</sub> &gt; 0：电池处于<strong>放电</strong>状态，电机补充驱动力</li>
                     <li>P<sub>batt</sub> &lt; 0：电池处于<strong>充电</strong>状态，发动机多余功率发电或制动能量回收</li>
                 </ul>
